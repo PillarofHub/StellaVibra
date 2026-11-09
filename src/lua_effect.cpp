@@ -1,0 +1,115 @@
+#include "lua_effect.h"
+#include <cmath>
+#include <cstdlib>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+namespace sv {
+void* LuaEffect::allocate(void* ud,void* pointer,size_t oldSize,size_t newSize) {
+    auto* self=static_cast<LuaEffect*>(ud); if(!pointer) oldSize=0;
+    if(!newSize) { self->allocated-=oldSize; free(pointer); return nullptr; }
+    if(newSize>8*1024*1024 || self->allocated-oldSize+newSize>8*1024*1024) return nullptr;
+    auto* result=realloc(pointer,newSize); if(result) self->allocated=self->allocated-oldSize+newSize; return result;
+}
+void LuaEffect::hook(lua_State* L,lua_Debug*) {
+    auto* self=*static_cast<LuaEffect**>(lua_getextraspace(L)); self->budget-=1000;
+    if(self->budget<=0 || nowMs()-self->started>20) luaL_error(L,"Lua instruction/time limit exceeded");
+}
+void LuaEffect::protectedCall(int args,int results) {
+    budget=200000; started=nowMs(); lua_sethook(state,hook,LUA_MASKCOUNT,1000);
+    int status=lua_pcall(state,args,results,0); lua_sethook(state,nullptr,0,0);
+    if(status!=LUA_OK) { auto error=QString::fromUtf8(lua_tostring(state,-1)); lua_pop(state,1); throw std::runtime_error(error.toStdString()); }
+}
+LuaEffect::LuaEffect(QString identity,QString source,QString filename):id(std::move(identity)) {
+    require(source.toUtf8().size()<=256*1024,"Lua source exceeds 256 KiB");
+    state=lua_newstate(allocate,this); require(state!=nullptr,"Cannot allocate Lua state");
+    *static_cast<LuaEffect**>(lua_getextraspace(state))=this;
+    sourceText=std::move(source); sourceName=std::move(filename);
+    try {
+        lua_pushcfunction(state,[](lua_State* L)->int {
+            auto* self=*static_cast<LuaEffect**>(lua_getextraspace(L));
+            try { self->initialize(); return 0; }
+            catch(const std::exception& e) { self->callbackError=e.what(); }
+            return luaL_error(L,"%s",self->callbackError.constData());
+        });
+        protectedCall(0,0);
+    } catch(...) { lua_close(state); state=nullptr; throw; }
+}
+void LuaEffect::initialize() {
+        for(auto lib: {std::pair{"_G",luaopen_base}, {"math",luaopen_math},{"string",luaopen_string},{"table",luaopen_table},{"utf8",luaopen_utf8}}) { luaL_requiref(state,lib.first,lib.second,1); lua_pop(state,1); }
+        for(auto name:{"dofile","loadfile","load","collectgarbage","print","warn","pcall","xpcall","setmetatable","getmetatable"}) { lua_pushnil(state); lua_setglobal(state,name); }
+        const char* helpers="function constant(s) return {mode='constant',strength=s} end function pwm(s) s.mode='pwm'; return s end function off() return {mode='off'} end";
+        require(luaL_loadstring(state,helpers)==LUA_OK,"Cannot load helpers"); lua_call(state,0,0);
+        auto bytes=sourceText.toUtf8(); auto name=("@"+sourceName).toUtf8();
+        if(luaL_loadbufferx(state,bytes.constData(),bytes.size(),name.constData(),"t")!=LUA_OK) { auto e=QString::fromUtf8(lua_tostring(state,-1)); throw std::runtime_error(e.toStdString()); }
+        lua_call(state,0,1); require(lua_istable(state,-1),"Script must return an effect table"); reference=luaL_ref(state,LUA_REGISTRYINDEX);
+        lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"init"); require(lua_isfunction(state,-1),"Missing init(api)"); lua_pushvalue(state,-2); pushApi(); registering=true; lua_call(state,2,0); registering=false; lua_pop(state,1);
+        lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"update"); require(lua_isfunction(state,-1),"Missing update(context)"); lua_pop(state,2);
+}
+LuaEffect::~LuaEffect() { if(state) lua_close(state); }
+void LuaEffect::pushApi() {
+    lua_newtable(state); int operation=0;
+    for(auto name:{"parameter","output","log","vibrate"}) { lua_pushlightuserdata(state,this); lua_pushinteger(state,operation++); lua_pushcclosure(state,dispatch,2); lua_setfield(state,-2,name); }
+}
+int LuaEffect::dispatch(lua_State* L) {
+    auto* self=static_cast<LuaEffect*>(lua_touserdata(L,lua_upvalueindex(1)));
+    try { return self->api(L,static_cast<int>(lua_tointeger(L,lua_upvalueindex(2)))); }
+    catch(const std::exception& e) { self->callbackError=e.what(); }
+    lua_pushstring(L,self->callbackError.constData()); return lua_error(L);
+}
+static QString stringAt(lua_State* L,int i) { require(lua_type(L,i)==LUA_TSTRING,"Expected string"); size_t size=0; auto p=lua_tolstring(L,i,&size); require(size>0 && size<=512,"Invalid string length"); return QString::fromUtf8(p,static_cast<qsizetype>(size)); }
+static double numberAt(lua_State* L,int i) { require(lua_type(L,i)==LUA_TNUMBER && std::isfinite(lua_tonumber(L,i)),"Expected finite number"); return lua_tonumber(L,i); }
+static double numberField(lua_State* L,int i,const char* name) { lua_getfield(L,i,name); auto v=numberAt(L,-1); lua_pop(L,1); return v; }
+int LuaEffect::api(lua_State* L,int operation) {
+    if(operation==0) {
+        require(registering && lua_istable(L,2) && parameters.size()<64,"Invalid parameter registration"); Parameter p;
+        lua_getfield(L,2,"name"); p.name=stringAt(L,-1); lua_pop(L,1);
+        for(const auto& old:parameters) require(old.name!=p.name,"Duplicate parameter");
+        lua_getfield(L,2,"default"); p.boolean=lua_isboolean(L,-1); if(p.boolean) p.initial=bool(lua_toboolean(L,-1)); else p.initial=numberAt(L,-1); lua_pop(L,1);
+        if(!p.boolean) { p.minimum=numberField(L,2,"min"); p.maximum=numberField(L,2,"max"); p.step=numberField(L,2,"step"); require(p.minimum<=p.maximum && p.step>0 && p.initial.toDouble()>=p.minimum && p.initial.toDouble()<=p.maximum,"Invalid parameter range"); }
+        parameters<<p; return 0;
+    }
+    if(operation==1) { require(registering && outputs.size()<64,"Output registration only in init"); auto name=stringAt(L,2); require(!outputs.contains(name),"Duplicate output"); outputs<<name; return 0; }
+    if(operation==2) { if(logs.size()<8) logs<<stringAt(L,2); return 0; }
+    require(!registering && pending.size()<128,"Invalid output call"); Request r; auto name=stringAt(L,2); require(outputs.contains(name),"Unknown output: "+name); r.key=id+"/"+name;
+    require(lua_istable(L,3),"Expected output specification"); lua_getfield(L,3,"mode"); auto mode=stringAt(L,-1); lua_pop(L,1);
+    if(mode=="off") { pending<<r; return 0; }
+    require(mode=="constant" || mode=="pwm","Unknown output mode"); r.mode=mode=="constant"?Mode::Constant:Mode::Pwm;
+    auto strength=numberField(L,3,"strength"); require(strength>=0 && strength<=255 && floor(strength)==strength,"Strength must be integer 0..255"); r.strength=static_cast<int>(strength);
+    auto duration=numberAt(L,4); require(duration>0 && duration<=60000,"Duration must be 0..60000 ms"); r.deadline=current+static_cast<qint64>(duration); r.phase=current;
+    if(r.mode==Mode::Pwm) { auto on=numberField(L,3,"on_ms"), period=numberField(L,3,"period_ms"); require(period>=20 && period<=60000 && on>=0 && on<=period,"Invalid PWM timing"); r.on=static_cast<int>(floor(on/20+0.5))*20; r.period=static_cast<int>(floor(period/20+0.5))*20; }
+    for(auto v:settings["outputs"].toObject()[name].toArray()) r.destinations<<v.toString();
+    pending<<r; return 0;
+}
+void LuaEffect::configure(const QJsonObject& values) {
+    validateSettings(values,false); settings=values; unresolved.clear(); auto stored=values["parameters"].toObject(); QJsonObject merged; QSet<QString> names;
+    for(const auto& p:parameters) { auto value=stored.contains(p.name)?stored[p.name]:p.initial; require(p.boolean ? value.isBool() : (value.isDouble() && value.toDouble()>=p.minimum && value.toDouble()<=p.maximum),"Invalid value: "+p.name); merged[p.name]=value; names.insert(p.name); }
+    for(auto it=stored.begin();it!=stored.end();++it) if(!names.contains(it.key())) unresolved<<"Parameter: "+it.key();
+    auto routes=values["outputs"].toObject(); for(auto it=routes.begin();it!=routes.end();++it) if(!outputs.contains(it.key())) unresolved<<"Output: "+it.key(); settings["parameters"]=merged;
+}
+void LuaEffect::pushJson(const QJsonValue& v) {
+    if(v.isBool()) lua_pushboolean(state,v.toBool()); else if(v.isDouble()) lua_pushnumber(state,v.toDouble()); else if(v.isString()) { auto b=v.toString().toUtf8(); lua_pushlstring(state,b.constData(),b.size()); }
+    else if(v.isObject()) { lua_newtable(state); auto o=v.toObject(); for(auto it=o.begin();it!=o.end();++it) { pushJson(it.value()); lua_setfield(state,-2,it.key().toUtf8().constData()); } }
+    else if(v.isArray()) { lua_newtable(state); int i=1; for(auto item:v.toArray()) { pushJson(item); lua_rawseti(state,-2,i++); } } else lua_pushnil(state);
+}
+QList<Request> LuaEffect::update(const Telemetry& t,bool fresh,qint64 now) {
+    current=now; updateTelemetry=t; updateFresh=fresh; pending.clear(); logs.clear(); lua_settop(state,0);
+    lua_pushcfunction(state,[](lua_State* L)->int {
+        auto* self=*static_cast<LuaEffect**>(lua_getextraspace(L));
+        self->performUpdate(); return 0;
+    });
+    protectedCall(0,0); previous=now; return pending;
+}
+void LuaEffect::performUpdate() {
+    const auto& t=updateTelemetry; const bool fresh=updateFresh; const auto now=current;
+    lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"update"); lua_pushvalue(state,-2); pushApi();
+    QJsonObject context{{"now_ms",double(now)},{"elapsed_ms",double(previous?now-previous:0)},{"is_new_sample",fresh},{"telemetry_age_ms",t.sequence?QJsonValue(double(now-t.received)):QJsonValue()},{"telemetry_valid",t.valid(now)},{"parameters",settings["parameters"]}};
+    QJsonObject telemetry;
+    if(t.sequence) { QJsonArray gears; for(int i=0;i<3;++i) gears.append(QJsonObject{{"contact",t.contact[i]},{"animation_percent",t.animation[i]}});
+        telemetry={{"sample_id",double(t.sequence)},{"received_ms",double(t.received)},{"sim_time_s",t.simTime},{"sim_time_advanced",fresh && t.advanced},{"aircraft_key",t.aircraft},{"ground_speed_knots",t.speed},{"on_ground",t.ground},{"gears",gears},{"msfs",QJsonObject{{"paused",t.paused}}}};
+    }
+    context["telemetry"]=telemetry; for(auto it=context.begin();it!=context.end();++it) { pushJson(it.value()); lua_setfield(state,-2,it.key().toUtf8().constData()); }
+    lua_call(state,2,0);
+}
+QStringList LuaEffect::takeLogs() { auto result=logs; logs.clear(); return result; }
+}
