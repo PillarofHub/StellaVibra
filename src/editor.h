@@ -8,7 +8,11 @@ public:
     void paintGutter(QPaintEvent* event);
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 private:
     QWidget* gutter;
+    QCompleter* completion;
+    QStringListModel* candidates;
+    void completeMember();
 };
 }

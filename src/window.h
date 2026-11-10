@@ -1,6 +1,7 @@
 #pragma once
 #include "engine.h"
 #include "editor.h"
+#include "effect_files.h"
 namespace sv {
 class Window : public QMainWindow {
 public:
@@ -11,15 +12,26 @@ protected:
 private:
     Engine engine;
     Project project;
+    Project savedProject;
     QJsonObject local;
     QMap<QString,QString> drafts;
-    QMap<QString,QString> looseDrafts;
+    QSet<QString> dirtyEffects;
+    QMap<QString,QByteArray> diskHashes;
+    QMenu* recentMenu;
+    QTabBar* fileTabs;
+    QStackedWidget* openFiles;
+    QMap<QString,QString> rawBases;
+    QMap<QString,QJsonObject> effectDefaults;
+    QWidget* paramPane;
+    QLabel* rawNotice;
+    QPushButton* pauseButton;
+    bool paused=false;
+    qint64 nextFileScan=0;
     QString selectedId,selectedScript,currentAircraft;
     bool refreshing=false,dirty=false;
-    QListWidget* effectList;
-    QFileSystemModel* files;
+    EffectFiles* files;
     QTreeView* tree;
-    Editor* editor;
+    Editor* editor=nullptr;
     QFormLayout* parameters;
     QWidget* parameterHost;
     QComboBox* profile;
@@ -32,12 +44,22 @@ private:
     void addLog(const QString& message);
     bool confirmDiscard();
     void newProject(); void openProject(); void loadProject(const QString& path);
-    void save(); void apply(); void addEffect();
-    void refreshExplorer(); void selectEffect(); void rebuildParameters();
+    void save(); void apply(const QString& reloadId=QString());
+    void saveAll(); void closeProject(); void closeFile(); void updateRecent(); void syncFiles();
+    void showScript(const QString& relative);
+    void refreshExplorer(); void rebuildParameters();
+    int tabIndex(const QString& path) const;
+    QString tabPath(int index) const;
+    void removeTab(int index); void clearTabs(); void activateTab(); void updateTabs();
+    bool hasRawDrafts() const;
+    void saveRaw(const QStringList& paths);
+    void refreshRawTabs();
+    void cacheDefaults(const QString& id,const LuaEffect& meta);
+    void refreshDefaults();
     QJsonObject selectedEffect() const;
     QString profileKey() const;
     void setValue(const QString& group,const QString& name,const QJsonValue& value,bool reset=false);
-    void tick(); void settings(); void mapping(); void motorTest();
+    void tick(); void mapping(); void motorTest();
     void saveLocal();
 };
 }

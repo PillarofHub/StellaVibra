@@ -13,7 +13,7 @@ add_library(lua STATIC ${LUA_SOURCES})
 # C++ exception unwinding keeps host callback objects safe on Lua allocation/errors.
 set_source_files_properties(${LUA_SOURCES} PROPERTIES LANGUAGE CXX)
 target_include_directories(lua PUBLIC "${LUA_SOURCE_DIR}")
-qt_add_executable(StellaVibra WIN32 src/main.cpp src/model.cpp src/lua_effect.cpp src/engine.cpp src/hid.cpp src/simconnect.cpp src/window.cpp src/editor.cpp)
+qt_add_executable(StellaVibra WIN32 src/main.cpp src/model.cpp src/lua_effect.cpp src/engine.cpp src/hid.cpp src/simconnect.cpp src/window.cpp src/window_project.cpp src/editor.cpp)
 target_link_libraries(StellaVibra PRIVATE Qt6::Widgets lua hid setupapi)
 target_compile_definitions(StellaVibra PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_compile_options(StellaVibra PRIVATE /W4 /utf-8 /permissive-)
