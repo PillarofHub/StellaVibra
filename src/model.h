@@ -19,12 +19,13 @@ struct Project {
     QJsonObject data;
     QMap<QString,QJsonObject> aircraft;
     QMap<QString,QString> aircraftPaths;
-    void load(const QString& file);
+    void load(const QString& file,const QMap<QString,QJsonObject>& replacements={});
     void save();
+    void compact(const QString& id,const QJsonObject& defaults);
     QJsonObject resolved(const QJsonObject& effect, const QString& key) const;
     void setOverride(const QString& key, const QString& id, const QJsonObject& value);
 };
-struct Parameter { QString name; bool boolean=false; QJsonValue initial; double minimum=0,maximum=255,step=1; };
+struct Parameter { QString name,type; bool boolean=false; QJsonValue initial; double minimum=0,maximum=255,step=1; };
 struct Telemetry {
     quint64 sequence=0;
     qint64 received=0, advancedAt=0;
@@ -37,5 +38,5 @@ struct Telemetry {
 };
 enum class Mode { Off, Constant, Pwm };
 struct Request { QString key; QStringList destinations; Mode mode=Mode::Off; int strength=0,on=0,period=20; qint64 deadline=0,phase=0; };
-struct Motor { QString id,label; QStringList destinations; bool connected=false,ambiguous=false; int sent=0; QString error; };
+struct Motor { QString id,label; QStringList destinations; bool connected=false,ambiguous=false; int sent=0; QString error; QString category="Throttle"; };
 }

@@ -65,14 +65,41 @@ int LuaEffect::api(lua_State* L,int operation) {
         require(registering && lua_istable(L,2) && parameters.size()<64,"Invalid parameter registration"); Parameter p;
         lua_getfield(L,2,"name"); p.name=stringAt(L,-1); lua_pop(L,1);
         for(const auto& old:parameters) require(old.name!=p.name,"Duplicate parameter");
-        lua_getfield(L,2,"default"); p.boolean=lua_isboolean(L,-1); if(p.boolean) p.initial=bool(lua_toboolean(L,-1)); else p.initial=numberAt(L,-1); lua_pop(L,1);
-        if(!p.boolean) { p.minimum=numberField(L,2,"min"); p.maximum=numberField(L,2,"max"); p.step=numberField(L,2,"step"); require(p.minimum<=p.maximum && p.step>0 && p.initial.toDouble()>=p.minimum && p.initial.toDouble()<=p.maximum,"Invalid parameter range"); }
+        lua_getfield(L,2,"type"); if(!lua_isnil(L,-1)) p.type=stringAt(L,-1); lua_pop(L,1);
+        lua_getfield(L,2,"default");
+        if(p.type.isEmpty()) p.type=lua_isboolean(L,-1)?"boolean":"float"; // Existing v1 scripts.
+        require(p.type=="boolean" || p.type=="int" || p.type=="float" || p.type=="haptic_power","Unknown parameter type");
+        p.boolean=p.type=="boolean";
+        if(p.boolean) { require(lua_isboolean(L,-1),"Expected boolean default"); p.initial=bool(lua_toboolean(L,-1)); }
+        else if(p.type=="haptic_power") {
+            require(lua_istable(L,-1),"haptic_power default must be a table");
+            int table=lua_absindex(L,-1); QJsonObject h;
+            for(auto field:{"strength","on_ms","period_ms"}) { lua_getfield(L,table,field); h[field]=lua_isnil(L,-1)?(QString(field)=="period_ms"?80:QString(field)=="on_ms"?20:0):numberAt(L,-1); lua_pop(L,1); }
+            lua_getfield(L,table,"pwm"); require(lua_isnil(L,-1)||lua_isboolean(L,-1),"Expected PWM boolean"); h["pwm"]=bool(lua_toboolean(L,-1)); lua_pop(L,1); p.initial=h;
+        } else p.initial=numberAt(L,-1);
+        lua_pop(L,1);
+        if(!p.boolean) {
+            if(p.type=="haptic_power") {
+                lua_getfield(L,2,"min"); p.minimum=lua_isnil(L,-1)?0:numberAt(L,-1); lua_pop(L,1);
+                lua_getfield(L,2,"max"); p.maximum=lua_isnil(L,-1)?255:numberAt(L,-1); lua_pop(L,1);
+                validateSettings({{"enabled",true},{"parameters",QJsonObject{{p.name,p.initial}}}},false);
+                require(p.minimum>=0 && p.maximum<=255,"Haptic strength range must be within 0..255");
+            } else { p.minimum=numberField(L,2,"min"); p.maximum=numberField(L,2,"max"); p.step=numberField(L,2,"step"); }
+            double initial=p.type=="haptic_power"?p.initial.toObject()["strength"].toDouble():p.initial.toDouble();
+            require(p.minimum<=p.maximum && p.step>0 && initial>=p.minimum && initial<=p.maximum && (p.maximum-p.minimum)/p.step<=1000000,"Invalid parameter range");
+            if(p.type=="int" || p.type=="haptic_power") require(floor(initial)==initial && floor(p.minimum)==p.minimum && floor(p.maximum)==p.maximum && floor(p.step)==p.step,"Expected integer range/default/step");
+        }
         parameters<<p; return 0;
     }
     if(operation==1) { require(registering && outputs.size()<64,"Output registration only in init"); auto name=stringAt(L,2); require(!outputs.contains(name),"Duplicate output"); outputs<<name; return 0; }
     if(operation==2) { if(logs.size()<8) logs<<stringAt(L,2); return 0; }
     require(!registering && pending.size()<128,"Invalid output call"); Request r; auto name=stringAt(L,2); require(outputs.contains(name),"Unknown output: "+name); r.key=id+"/"+name;
-    require(lua_istable(L,3),"Expected output specification"); lua_getfield(L,3,"mode"); auto mode=stringAt(L,-1); lua_pop(L,1);
+    require(lua_istable(L,3),"Expected output specification"); lua_getfield(L,3,"mode"); QString mode;
+    if(lua_isnil(L,-1)) {
+        lua_pop(L,1);lua_getfield(L,3,"pwm");require(lua_isboolean(L,-1),"Expected output mode or haptic_power PWM boolean");
+        mode=lua_toboolean(L,-1)?"pwm":"constant";
+    } else mode=stringAt(L,-1);
+    lua_pop(L,1);
     if(mode=="off") { pending<<r; return 0; }
     require(mode=="constant" || mode=="pwm","Unknown output mode"); r.mode=mode=="constant"?Mode::Constant:Mode::Pwm;
     auto strength=numberField(L,3,"strength"); require(strength>=0 && strength<=255 && floor(strength)==strength,"Strength must be integer 0..255"); r.strength=static_cast<int>(strength);
@@ -83,7 +110,13 @@ int LuaEffect::api(lua_State* L,int operation) {
 }
 void LuaEffect::configure(const QJsonObject& values) {
     validateSettings(values,false); settings=values; unresolved.clear(); auto stored=values["parameters"].toObject(); QJsonObject merged; QSet<QString> names;
-    for(const auto& p:parameters) { auto value=stored.contains(p.name)?stored[p.name]:p.initial; require(p.boolean ? value.isBool() : (value.isDouble() && value.toDouble()>=p.minimum && value.toDouble()<=p.maximum),"Invalid value: "+p.name); merged[p.name]=value; names.insert(p.name); }
+    for(const auto& p:parameters) {
+        auto value=stored.contains(p.name)?stored[p.name]:p.initial;
+        auto number=p.type=="haptic_power"?value.toObject()["strength"]:value;
+        require(p.boolean ? value.isBool() : (number.isDouble() && number.toDouble()>=p.minimum && number.toDouble()<=p.maximum && (p.type=="float" || floor(number.toDouble())==number.toDouble())),"Invalid value: "+p.name);
+        if(p.type=="haptic_power") require(value.isObject(),"Expected haptic_power object");
+        merged[p.name]=value; names.insert(p.name);
+    }
     for(auto it=stored.begin();it!=stored.end();++it) if(!names.contains(it.key())) unresolved<<"Parameter: "+it.key();
     auto routes=values["outputs"].toObject(); for(auto it=routes.begin();it!=routes.end();++it) if(!outputs.contains(it.key())) unresolved<<"Output: "+it.key(); settings["parameters"]=merged;
 }

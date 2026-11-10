@@ -20,19 +20,34 @@ QString scriptPath(const QString& project,const QString& relative) {
     auto base=QFileInfo(project).absolutePath(); auto clean=QDir::cleanPath(QDir(base).absoluteFilePath(relative));
     require(clean.startsWith(base+"/",Qt::CaseInsensitive),"Script path escapes project");
     auto canonical=QFileInfo(clean).canonicalFilePath(); auto root=QFileInfo(base).canonicalFilePath();
-    require(!canonical.isEmpty() && canonical.startsWith(root+"/",Qt::CaseInsensitive),"Missing script or symlink outside project: "+relative); return canonical;
+    if(canonical.isEmpty()) {
+        auto parent=QFileInfo(clean).absolutePath();
+        while(!QFileInfo::exists(parent)) {auto next=QFileInfo(parent).absolutePath();if(next==parent)break;parent=next;}
+        auto ancestor=QFileInfo(parent).canonicalFilePath();
+        require(ancestor==root || ancestor.startsWith(root+"/",Qt::CaseInsensitive),"Script path escapes project");
+        return clean;
+    }
+    require(canonical.startsWith(root+"/",Qt::CaseInsensitive),"Symlink outside project: "+relative); return canonical;
 }
 void validateSettings(const QJsonObject& o,bool partial) {
-    require((partial && !o.contains("enabled")) || o["enabled"].isBool(),"Invalid enabled value");
+    Q_UNUSED(partial);require(!o.contains("enabled") || o["enabled"].isBool(),"Invalid enabled value");
     for(auto field:{"parameters","outputs"}) require(!o.contains(field) || o[field].isObject(),QString("Invalid ")+field);
-    auto params=o["parameters"].toObject(); for(auto it=params.begin();it!=params.end();++it) require(it.value().isBool() || (it.value().isDouble() && std::isfinite(it.value().toDouble())),"Invalid parameter value");
+    auto params=o["parameters"].toObject(); for(auto it=params.begin();it!=params.end();++it) {
+        auto v=it.value();
+        if(v.isObject()) {
+            auto h=v.toObject(); require(h.size()==4 && h["pwm"].isBool(),"Invalid haptic_power value");
+            for(auto k:{"strength","on_ms","period_ms"}) require(h[k].isDouble() && std::isfinite(h[k].toDouble()) && floor(h[k].toDouble())==h[k].toDouble(),"Invalid haptic_power number");
+            require(h["strength"].toDouble()>=0 && h["strength"].toDouble()<=255 && h["on_ms"].toDouble()>=0 && h["period_ms"].toDouble()>=20 && h["period_ms"].toDouble()<=60000 && h["on_ms"].toDouble()<=h["period_ms"].toDouble(),"Invalid haptic_power range");
+        } else require(v.isBool() || (v.isDouble() && std::isfinite(v.toDouble())),"Invalid parameter value");
+    }
     auto outputs=o["outputs"].toObject(); for(auto it=outputs.begin();it!=outputs.end();++it) {
         require(it.value().isArray(),"Output destinations must be an array"); QSet<QString> used;
         for(auto v:it.value().toArray()) { require(v.isString() && logicalSlots().contains(v.toString()) && !used.contains(v.toString()),"Invalid or duplicate slot"); used.insert(v.toString()); }
     }
 }
-void Project::load(const QString& file) {
-    Project next; next.path=QFileInfo(file).absoluteFilePath(); next.data=readJson(file);
+void Project::load(const QString& file,const QMap<QString,QJsonObject>& replacements) {
+    auto read=[&](const QString& path){auto absolute=QFileInfo(path).absoluteFilePath();QJsonObject o;bool replaced=false;for(auto it=replacements.begin();it!=replacements.end();++it)if(it.key().compare(absolute,Qt::CaseInsensitive)==0){o=it.value();replaced=true;break;}if(!replaced)o=readJson(path);require(o["version"]==1,"Unsupported file version: "+path);return o;};
+    Project next; next.path=QFileInfo(file).absoluteFilePath(); next.data=read(file);
     require(next.data["id"].isString() && !next.data["id"].toString().isEmpty() && next.data["name"].isString() && next.data["game"]=="MSFS2024" && next.data["effects"].isArray(),"Invalid project schema");
     require(next.data["effects"].toArray().size()<=64,"At most 64 effects are supported");
     QSet<QString> ids, paths;
@@ -42,7 +57,7 @@ void Project::load(const QString& file) {
         auto source=scriptPath(next.path,e["script"].toString()); require(!paths.contains(source.toLower()),"Duplicate script instance"); paths.insert(source.toLower()); validateSettings(e,false);
     }
     QDir folder(QFileInfo(file).absolutePath()+"/aircrafts"); for(auto name:folder.entryList({"*.sv"},QDir::Files)) {
-        auto o=readJson(folder.filePath(name)); auto key=o["aircraft_key"].toString(); require(!key.isEmpty() && !next.aircraft.contains(key) && o["effects"].isObject(),"Invalid or duplicate aircraft key");
+        auto o=read(folder.filePath(name)); auto key=o["aircraft_key"].toString(); require(!key.isEmpty() && !next.aircraft.contains(key) && o["effects"].isObject(),"Invalid or duplicate aircraft key");
         auto effects=o["effects"].toObject(); for(auto it=effects.begin();it!=effects.end();++it) { require(it.value().isObject(),"Invalid override"); validateSettings(it.value().toObject(),true); }
         next.aircraft[key]=o; next.aircraftPaths[key]=folder.filePath(name);
     }
@@ -51,11 +66,24 @@ void Project::load(const QString& file) {
 void Project::save() { require(!path.isEmpty(),"No project"); writeJson(path,data); for(auto it=aircraft.begin();it!=aircraft.end();++it) writeJson(aircraftPaths[it.key()],it.value()); }
 QJsonObject Project::resolved(const QJsonObject& effect,const QString& key) const {
     auto result=effect; auto patch=aircraft.value(key)["effects"].toObject()[effect["id"].toString()].toObject();
+    if(!result.contains("enabled"))result["enabled"]=true;
     if(patch.contains("enabled")) result["enabled"]=patch["enabled"];
     for(auto field:{"parameters","outputs"}) { auto merged=result[field].toObject(); auto values=patch[field].toObject(); for(auto it=values.begin();it!=values.end();++it) merged[it.key()]=it.value(); result[field]=merged; } return result;
 }
+void Project::compact(const QString& id,const QJsonObject& defaults) {
+    auto trim=[](QJsonObject o,const QJsonObject& base){
+        if(o.contains("enabled") && o["enabled"]==base["enabled"])o.remove("enabled");
+        for(auto group:{"parameters","outputs"}){auto values=o[group].toObject();auto inherited=base[group].toObject();for(auto key:values.keys())if(inherited.contains(key)&&values[key]==inherited[key])values.remove(key);if(values.isEmpty())o.remove(group);else o[group]=values;}return o;
+    };
+    auto entries=data["effects"].toArray();QJsonObject global;
+    for(int i=0;i<entries.size();++i)if(entries[i].toObject()["id"]==id){global=trim(entries[i].toObject(),defaults);entries[i]=global;break;}
+    if(global.isEmpty())return;data["effects"]=entries;
+    auto base=defaults;if(global.contains("enabled"))base["enabled"]=global["enabled"];
+    for(auto group:{"parameters","outputs"}){auto values=base[group].toObject();auto stored=global[group].toObject();for(auto it=stored.begin();it!=stored.end();++it)values[it.key()]=it.value();base[group]=values;}
+    for(auto key:aircraft.keys()){auto patch=aircraft[key]["effects"].toObject()[id].toObject();if(!patch.isEmpty())setOverride(key,id,trim(patch,base));}
+}
 void Project::setOverride(const QString& key,const QString& id,const QJsonObject& value) {
-    if(!aircraft.contains(key)) { aircraft[key]=QJsonObject{{"version",1},{"aircraft_key",key},{"effects",QJsonObject{}}}; aircraftPaths[key]=QFileInfo(path).absolutePath()+"/aircrafts/"+QUuid::createUuid().toString(QUuid::WithoutBraces)+".sv"; }
+    if(!aircraft.contains(key)) { aircraft[key]=QJsonObject{{"version",1},{"aircraft_key",key},{"effects",QJsonObject{}}}; if(!aircraftPaths.contains(key))aircraftPaths[key]=QFileInfo(path).absolutePath()+"/aircrafts/"+QUuid::createUuid().toString(QUuid::WithoutBraces)+".sv"; }
     auto o=aircraft[key]; auto effects=o["effects"].toObject(); if(value.isEmpty()) effects.remove(id); else effects[id]=value; o["effects"]=effects; aircraft[key]=o;
 }
 }

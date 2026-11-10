@@ -2,14 +2,11 @@ local effect = {}
 local ports = {"Center Gear", "Left Gear", "Right Gear"}
 
 function effect:init(api)
-    api:parameter {name="Strength", default=40, min=0, max=255, step=1}
-    api:parameter {name="Minimum ms", default=100, min=20, max=3000, step=1}
-    api:parameter {name="Maximum ms", default=1000, min=20, max=5000, step=1}
-    api:parameter {name="Time multiplier", default=1, min=0.1, max=10, step=0.1}
-    api:parameter {name="Minimum speed knots", default=5, min=0, max=100, step=0.5}
-    api:parameter {name="PWM", default=false}
-    api:parameter {name="ON ms", default=20, min=0, max=1000, step=1}
-    api:parameter {name="Period ms", default=80, min=20, max=1000, step=1}
+    api:parameter {name="Power", type="haptic_power", default={strength=40, pwm=false, on_ms=20, period_ms=80}}
+    api:parameter {name="Minimum ms", type="int", default=100, min=20, max=3000, step=1}
+    api:parameter {name="Maximum ms", type="int", default=1000, min=20, max=5000, step=1}
+    api:parameter {name="Time multiplier", type="float", default=1, min=0.1, max=10, step=0.1}
+    api:parameter {name="Minimum speed knots", type="float", default=5, min=0, max=100, step=0.5}
     self.gears = {}
     for index, name in ipairs(ports) do
         api:output(name)
@@ -71,12 +68,7 @@ function effect:update(context)
             end
             local remaining = state.deadline and state.deadline - context.now_ms or 0
             if remaining > 0 then
-                local specification = constant(parameters.Strength)
-                if parameters.PWM then
-                    specification = pwm {strength=parameters.Strength,
-                        on_ms=parameters["ON ms"], period_ms=parameters["Period ms"]}
-                end
-                context:vibrate(name, specification, remaining)
+                context:vibrate(name, parameters.Power, remaining)
             else
                 context:vibrate(name, off())
             end

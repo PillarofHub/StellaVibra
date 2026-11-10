@@ -7,15 +7,13 @@ namespace sv {
 Engine::Engine() { runtimeThread=std::thread([this]{runtimeLoop();}); hidThread=std::thread([this]{hidLoop();}); }
 Engine::~Engine() { stop(); quitting=true; runtimeThread.join(); hidThread.join(); }
 void Engine::log(const QString& text) { std::lock_guard lock(mutex); logs<<text; while(logs.size()>1000) logs.removeFirst(); }
-void Engine::apply(Bundle bundle) { std::lock_guard lock(mutex); pending=std::make_unique<Bundle>(std::move(bundle)); }
-void Engine::clearProject() { stop(); ready=false; ++projectRevision; std::lock_guard lock(mutex); clearRequested=true; pending.reset(); }
-void Engine::run() { require(ready,"Apply a valid project before Run"); ++generation; running=true; }
+void Engine::apply(Bundle bundle) { std::lock_guard lock(mutex); if(pending)bundle.reloadIds.unite(pending->reloadIds); pending=std::make_unique<Bundle>(std::move(bundle)); }
+void Engine::clearProject() { ready=false; ++projectRevision; ++generation; std::lock_guard lock(mutex); requests.clear(); disabled.clear(); testMotor.clear(); clearRequested=true; pending.reset(); }
+void Engine::run() { ++generation; running=true; }
 void Engine::stop() { running=false; ++generation; std::lock_guard lock(mutex); requests.clear(); testMotor.clear(); execution="Stopped"; }
 void Engine::disable(const QString& id) { std::lock_guard lock(mutex); disabled.insert(id); for(auto it=requests.begin();it!=requests.end();) if(it.key().startsWith(id+"/")) it=requests.erase(it); else ++it; }
-void Engine::connectSim(QString path) { stop(); std::lock_guard lock(mutex); dllPath=std::move(path); connectRequested=true; }
-void Engine::scanHid() { stop(); std::lock_guard lock(mutex); scanRequested=true; }
 void Engine::loadMappings(QJsonObject values) { std::lock_guard lock(mutex); mappings=std::move(values); }
-void Engine::mapMotor(QString id,QStringList destinations) { stop(); std::lock_guard lock(mutex); QJsonArray list; for(const auto& s:destinations) if(logicalSlots().contains(s)) list<<s; mappings[id]=QJsonObject{{"slots",list},{"manual",true}}; for(auto& motor:motors) if(motor.id==id) motor.destinations=destinations; }
+void Engine::mapMotor(QString id,QStringList destinations) { std::lock_guard lock(mutex); QJsonArray list; for(const auto& s:destinations) if(logicalSlots().contains(s)) list<<s; mappings[id]=QJsonObject{{"slots",list},{"manual",true}}; for(auto& motor:motors) if(motor.id==id) motor.destinations=destinations; }
 void Engine::test(QString motor,Mode mode,int strength,int on,int period,int duration) {
     require(strength>=0 && strength<=255 && duration>0 && duration<=5000 && on>=0 && period>=20 && on<=period,"Invalid motor test");
     std::lock_guard lock(mutex); bool found=false; for(const auto& m:motors) if(m.id==motor && m.connected) found=true; require(found,"Motor not connected");
@@ -25,30 +23,75 @@ void Engine::stopTest() { std::lock_guard lock(mutex); testMotor.clear(); }
 Snapshot Engine::snapshot() { std::lock_guard lock(mutex); Snapshot s{simStatus,aircraftKey,execution,motors,logs,mappings}; logs.clear(); return s; }
 static std::vector<std::unique_ptr<LuaEffect>> instantiate(const Bundle& b,const QString& key) {
     std::vector<std::unique_ptr<LuaEffect>> result;
-    for(auto value:b.project.data["effects"].toArray()) { auto e=value.toObject(); auto path=e["script"].toString(); auto instance=std::make_unique<LuaEffect>(e["id"].toString(),b.sources.value(path),path); instance->configure(b.project.resolved(e,key)); result.push_back(std::move(instance)); }
+    for(auto value:b.project.data["effects"].toArray()) { auto e=value.toObject(); auto path=e["script"].toString(); if(!b.sources.contains(path))continue; auto instance=std::make_unique<LuaEffect>(e["id"].toString(),b.sources.value(path),path); instance->configure(b.project.resolved(e,key)); result.push_back(std::move(instance)); }
     return result;
 }
 void Engine::runtimeLoop() {
     SimConnect sim; Bundle active; bool hasActive=false,wasValid=false; Telemetry telemetry; quint64 localGeneration=0; qint64 lastUpdate=0;
-    std::vector<std::unique_ptr<LuaEffect>> effects;
+    std::vector<std::unique_ptr<LuaEffect>> effects; qint64 nextConnect=0; QString lastConnectionError;
     while(!quitting) {
         auto now=nowMs(); heartbeat=now;
-        std::unique_ptr<Bundle> change; bool connect=false,clear=false; QString dll; QSet<QString> muted; quint64 revision;
-        { std::lock_guard lock(mutex); change=std::move(pending); revision=projectRevision; connect=connectRequested; connectRequested=false; clear=clearRequested; clearRequested=false; dll=dllPath; muted=disabled; }
+        std::unique_ptr<Bundle> change; bool connect=false,clear=false; QSet<QString> muted; quint64 revision;
+        { std::lock_guard lock(mutex); change=std::move(pending); revision=projectRevision; clear=clearRequested; clearRequested=false; muted=disabled; }
         if(clear) { effects.clear(); active={}; hasActive=false; }
+        if(!sim.connected() && now>=nextConnect) connect=true;
+        if(connect) {
+            nextConnect=now+2000;
+            try { sim.connect(); telemetry={}; ++generation; lastConnectionError.clear(); log("MSFS connected"); }
+            catch(const std::exception& e) { sim.status="Disconnected / retrying"; if(lastConnectionError!=e.what()){lastConnectionError=e.what();log(lastConnectionError);} }
+        }
         try {
-            if(connect) { sim.connect(dll); telemetry={}; ++generation; }
             if(change) {
-                // Validate every profile before replacing the active project.
-                auto prepared=instantiate(*change,telemetry.aircraft);
-                auto globalValidation=instantiate(*change,QString());
-                for(auto it=change->project.aircraft.begin();it!=change->project.aircraft.end();++it) { auto validation=instantiate(*change,it.key()); }
-                require(revision==projectRevision.load(),"Discarded Apply from previous project");
-                active=std::move(*change); effects=std::move(prepared); hasActive=true; localGeneration=++generation;
-                { std::lock_guard lock(mutex); requests.clear(); disabled.clear(); ready=revision==projectRevision.load(); }
-                log("Apply succeeded");
+                Bundle accepted=*change; QJsonArray acceptedEntries;
+                std::vector<std::unique_ptr<LuaEffect>> prepared;
+                QSet<QString> retained,reloaded;
+                for(auto value:change->project.data["effects"].toArray()) {
+                    auto e=value.toObject();auto id=e["id"].toString();auto path=e["script"].toString();
+                    if(!change->sources.contains(path))continue;
+                    QJsonObject oldEntry;
+                    for(auto v:active.project.data["effects"].toArray())if(v.toObject()["id"]==id)oldEntry=v.toObject();
+                    auto oldPath=oldEntry["script"].toString();
+                    auto old=std::find_if(effects.begin(),effects.end(),[&](const auto& item){return item && item->id==id;});
+                    bool sameSource=!change->reloadIds.contains(id) && !oldEntry.isEmpty() && active.sources.value(oldPath)==change->sources.value(path);
+                    bool sameSettings=e==oldEntry;
+                    auto keys=change->project.aircraft.keys();for(auto key:active.project.aircraft.keys())if(!keys.contains(key))keys<<key;
+                    for(const auto& key:keys)if(change->project.resolved(e,key)!=active.project.resolved(oldEntry,key))sameSettings=false;
+                    if(sameSource && sameSettings) {
+                        acceptedEntries<<e;
+                        if(old!=effects.end()){retained.insert(id);prepared.push_back(std::move(*old));}
+                        continue;
+                    }
+                    try {
+                        auto candidate=std::make_unique<LuaEffect>(id,change->sources[path],path);
+                        candidate->configure(change->project.resolved(e,QString()));
+                        for(auto key:change->project.aircraft.keys())candidate->configure(change->project.resolved(e,key));
+                        candidate->configure(change->project.resolved(e,telemetry.aircraft));
+                        if(sameSource && old!=effects.end()) {
+                            bool keep=(*old)->settings["enabled"]==candidate->settings["enabled"] && (*old)->settings["outputs"]==candidate->settings["outputs"];
+                            (*old)->configure(candidate->settings);if(keep)retained.insert(id);candidate=std::move(*old);
+                        } else if(!sameSource) reloaded.insert(id);
+                        if(!sameSource || !muted.contains(id))prepared.push_back(std::move(candidate));
+                        acceptedEntries<<e;
+                    } catch(const std::exception& error) {
+                        log("ERROR "+id+" (saved script/settings not activated): "+error.what());
+                        if(!oldEntry.isEmpty()) {
+                            // Keep only this effect's last valid source/settings; other effects still update.
+                            oldEntry["script"]=path;acceptedEntries<<oldEntry;accepted.sources[path]=active.sources.value(oldPath);
+                            for(auto key:accepted.project.aircraft.keys())accepted.project.setOverride(key,id,active.project.aircraft.value(key)["effects"].toObject()[id].toObject());
+                            if(old!=effects.end()){retained.insert(id);prepared.push_back(std::move(*old));}
+                        }
+                    }
+                }
+                require(revision==projectRevision.load(),"Discarded update from previous project");
+                accepted.project.data["effects"]=acceptedEntries;active=std::move(accepted);effects=std::move(prepared);hasActive=true;
+                // Do not consume a concurrent Stop/Resume generation; the next update must reset state.
+                { std::lock_guard lock(mutex);
+                    for(auto it=requests.begin();it!=requests.end();) {if(!retained.contains(it.key().section('/',0,0)))it=requests.erase(it);else ++it;}
+                    for(const auto& id:reloaded){disabled.remove(id);muted.remove(id);}ready=revision==projectRevision.load();
+                }
+
             }
-        } catch(const std::exception& e) { log(QString("Apply/connection error: ")+e.what()); }
+        } catch(const std::exception& e) { log(QString("Update error: ")+e.what()); }
         try {
             auto samples=sim.poll();
             if(samples.isEmpty() && now-lastUpdate>=100) samples<<telemetry;
@@ -58,7 +101,7 @@ void Engine::runtimeLoop() {
                 telemetry=t; now=nowMs(); bool valid=t.valid(now) && sim.connected(); inputDeadline=valid?std::min(t.received+500,t.advancedAt+500):0;
                 if(wasValid && !valid) reset=true; wasValid=valid;
                 if(reset) { localGeneration=generation.load(); { std::lock_guard lock(mutex); requests.clear(); } if(hasActive) effects=instantiate(active,t.aircraft); }
-                { std::lock_guard lock(mutex); aircraftKey=t.aircraft; execution=running?(hasActive?(valid?"Running":"Running / waiting for valid telemetry"):"Run unavailable / apply a project"):"Stopped"; }
+                { std::lock_guard lock(mutex); aircraftKey=t.aircraft; execution=running?(hasActive?(valid?"Running":"Running / waiting for valid telemetry"):"Waiting for a project"):"Stopped"; }
                 if(running && ready && hasActive && valid) for(auto& effect:effects) {
                     if(!effect || muted.contains(effect->id) || !effect->settings["enabled"].toBool()) continue;
                     try {
@@ -83,21 +126,25 @@ static bool stronger(const Request& a,const Request& b) {
     return std::tuple{a.mode==Mode::Constant,a.strength,-a.period,a.on}>std::tuple{b.mode==Mode::Constant,b.strength,-b.period,b.on};
 }
 void Engine::hidLoop() {
-    Hid hid; QMap<QString,QString> winners; QSet<QString> touched; auto next=std::chrono::steady_clock::now();
+    Hid hid; QMap<QString,QString> winners; QSet<QString> touched; auto next=std::chrono::steady_clock::now(); qint64 nextScan=0;
     while(!quitting) {
-        next+=std::chrono::milliseconds(20); bool scan=false; { std::lock_guard lock(mutex); scan=scanRequested; scanRequested=false; }
+        next+=std::chrono::milliseconds(20); bool scan=false;
+        if(nowMs()>=nextScan)scan=true;
         if(scan) {
-            for(const auto& id:touched) { QString error; hid.write(id,0,error); } touched.clear();
-            try { auto discovered=hid.scan(); std::lock_guard lock(mutex);
+            nextScan=nowMs()+1000;
+            try { auto discovered=hid.scan();auto messages=hid.takeLogs(); std::lock_guard lock(mutex);logs.append(messages);
                 QSet<QString> occupied; for(auto it=mappings.begin();it!=mappings.end();++it) for(auto v:it.value().toObject()["slots"].toArray()) occupied.insert(v.toString());
                 for(auto& motor:discovered) {
                     if(!mappings.contains(motor.id) && !motor.ambiguous) {
-                        QJsonArray assigned; for(int i=1;i<=4;++i) { auto s="Throttle:"+QString::number(i); if(!occupied.contains(s)) { assigned<<s; occupied.insert(s); break; } }
+                        QJsonArray assigned; for(int i=1;i<=4;++i) { auto s=motor.category+":"+QString::number(i); if(!occupied.contains(s)) { assigned<<s; occupied.insert(s); break; } }
                         mappings[motor.id]=QJsonObject{{"slots",assigned},{"manual",false}};
                     }
                     if(!motor.ambiguous) for(auto v:mappings[motor.id].toObject()["slots"].toArray()) motor.destinations<<v.toString();
+                    for(const auto& old:motors) if(old.id==motor.id && old.connected) { motor.sent=old.sent; if(motor.ambiguous)motor.destinations=old.destinations; }
+                    bool wasConnected=false;for(const auto& old:motors)if(old.id==motor.id && old.connected)wasConnected=true;
+                    if(!wasConnected)logs<<"HID connected: "+motor.label+" ["+motor.id+"]";
                 }
-                for(auto old:motors) { bool found=false;for(const auto& motor:discovered)if(motor.id==old.id)found=true;if(!found){old.connected=false;old.sent=0;old.error="Disconnected / mapping reserved";discovered<<old;} }
+                for(auto old:motors) { bool found=false;for(const auto& motor:discovered)if(motor.id==old.id)found=true;if(!found){if(old.connected)logs<<"HID disconnected: "+old.label;old.connected=false;old.sent=0;old.error="Disconnected / mapping reserved";discovered<<old;} }
                 motors=discovered;
             } catch(const std::exception& e) { log(QString("HID: ")+e.what()); }
         }
@@ -118,7 +165,9 @@ void Engine::hidLoop() {
             int strength=0; if(best) { winners[motor.id]=best->key; if(best->mode==Mode::Constant || (best->mode==Mode::Pwm && (now-best->phase)%best->period<best->on)) strength=best->strength; } else winners.remove(motor.id);
             // No report is sent merely because a device was opened. Once driven, send zero on release.
             if(strength || touched.contains(motor.id)) {
-                QString error; bool ok=hid.write(motor.id,strength,error); if(strength && ok) touched.insert(motor.id); if(!strength || !ok) touched.remove(motor.id);
+                QString error; bool ok=hid.write(motor.id,strength,error);
+                // A failed multi-report write can have partially reached the device. Retry zero after reconnect.
+                if(strength)touched.insert(motor.id);if(!strength && ok)touched.remove(motor.id);
                 std::lock_guard lock(mutex); for(auto& stored:motors) if(stored.id==motor.id) { stored.sent=ok?strength:0; if(!ok) {stored.connected=false;stored.error=error;logs<<motor.label+": "+error;} }
             }
         }

@@ -6,7 +6,7 @@
 #include <thread>
 #include <memory>
 namespace sv {
-struct Bundle { Project project; QMap<QString,QString> sources; };
+struct Bundle { Project project; QMap<QString,QString> sources; QSet<QString> reloadIds; };
 struct Snapshot { QString sim="Disconnected",aircraft,execution="Stopped"; QList<Motor> motors; QStringList logs; QJsonObject mappings; };
 class Engine {
 public:
@@ -14,7 +14,6 @@ public:
     void apply(Bundle bundle);
     void clearProject();
     void run(); void stop(); void disable(const QString& id);
-    void connectSim(QString path); void scanHid();
     void mapMotor(QString id,QStringList destinations);
     void loadMappings(QJsonObject mappings);
     void test(QString motor,Mode mode,int strength,int on,int period,int duration);
@@ -23,15 +22,13 @@ public:
 private:
     std::mutex mutex;
     std::thread runtimeThread,hidThread;
-    std::atomic<bool> quitting=false, running=false;
+    std::atomic<bool> quitting=false, running=true;
     std::atomic<bool> ready=false;
     std::atomic<quint64> projectRevision=0;
     std::atomic<quint64> generation=1;
     std::atomic<qint64> heartbeat=0, inputDeadline=0;
     std::unique_ptr<Bundle> pending;
-    bool scanRequested=false,connectRequested=false;
     bool clearRequested=false;
-    QString dllPath;
     QSet<QString> disabled;
     QMap<QString,Request> requests;
     QJsonObject mappings;
