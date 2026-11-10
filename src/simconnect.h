@@ -2,11 +2,11 @@
 #include "model.h"
 #include <windows.h>
 namespace sv {
-// Public SimConnect ABI subset; see CONTRACTS.md. No SDK binary is bundled.
+// Public SimConnect ABI subset; the local package supplies the official client DLL.
 class SimConnect {
 public:
     ~SimConnect();
-    void connect(const QString& dll);
+    void connect();
     void disconnect();
     QList<Telemetry> poll();
     QString status="Disconnected";
@@ -20,8 +20,11 @@ private:
     using RequestData=HRESULT(WINAPI*)(HANDLE,DWORD,DWORD,DWORD,DWORD,DWORD,DWORD,DWORD,DWORD);
     using Next=HRESULT(WINAPI*)(HANDLE,void**,DWORD*);
     using Subscribe=HRESULT(WINAPI*)(HANDLE,DWORD,LPCSTR);
+    using SystemState=HRESULT(WINAPI*)(HANDLE,DWORD,LPCSTR);
     Close closeFunction=nullptr;
     Next nextFunction=nullptr;
+    SystemState systemStateFunction=nullptr;
+    qint64 nextCheck=0,checkDeadline=0;
     bool paused=true;
     Telemetry previous;
     QByteArray lastPacket;
