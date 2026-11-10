@@ -9,13 +9,13 @@
 기체 `aircrafts/UUID.sv`: `{"version":1,"aircraft_key":"정확한 TITLE","effects":{"효과 UUID":{"enabled":false,"parameters":{"Strength":10},"outputs":{"Left Gear":[]}}}}`.
 누락은 상속, false와 []는 명시값. 출력은 이름별 전체 교체. Reset to Global은 해당 키 삭제. 일치하는 기체 파일이 두 개면 실행 거부. 기체 키는 같은 샘플의 TITLE 문자열 전체다. TITLE을 정규화·부분 매칭하지 않는다.
 
-로컬 파일은 Qt AppLocalDataLocation의 `local.json` (`%LOCALAPPDATA%/StellaVibra/StellaVibra/local.json`): `{"version":1,"simconnect_dll":"절대 경로","motors":{"장치키/Left":{"slots":["Throttle:1"],"manual":false}},"geometry":"base64","layout":"base64"}`. 물리 식별은 VID/PID+일련번호. 일련번호가 없거나 중복이면 경로 기반 임시 키로 표시하고 자동 배정하지 않으며 매 앱 세션 수동 확인이 필요하다. 의도적 해제는 manual=true와 빈 slots로 보존한다. 예약된 매핑도 자동 배정 시 점유로 센다. 슬롯은 Yoke/Stick/Throttle/Pedal/Wheel 각각 :1–:4다.
+로컬 파일은 Qt AppLocalDataLocation의 `local.json` (`%LOCALAPPDATA%/StellaVibra/StellaVibra/local.json`): `{"version":1,"last_project":"절대 경로","recent_projects":["절대 경로"],"motors":{"장치키/Left":{"slots":["Throttle:1"],"manual":false}},"geometry":"base64","layout":"base64"}`. 물리 식별은 VID/PID+일련번호. 일련번호가 없거나 중복이면 경로 기반 임시 키로 표시하고 자동 배정하지 않으며 매 앱 세션 수동 확인이 필요하다. 의도적 해제는 manual=true와 빈 slots로 보존한다. 예약된 매핑도 자동 배정 시 점유로 센다. 슬롯은 Yoke/Stick/Throttle/Pedal/Wheel 각각 :1–:4다.
 
 JSON 상위 버전·잘못된 자료형·경로 이탈·중복 ID는 거부한다. 프로젝트 기준 상대 Lua 경로만 허용한다. QSaveFile로 파일별 원자 교체하며 프로젝트 전체 다중 파일 트랜잭션은 아니다. 미해결 파라미터/포트 키는 보존하고 UI에 표시한다.
 
 ## Lua
 
-파일은 `local effect = {}; function effect:init(api) ... end; function effect:update(context) ... end; return effect` 형식이다. self는 해당 인스턴스의 테이블이다. init에서만 `api:parameter{name=string,default=number,min=number,max=number,step=positive number}` 또는 boolean default를 등록한다. 숫자는 유한하고 범위 안이어야 한다. 이름 중복은 오류다. `api:output(name)`은 이름 문자열 포트를 등록한다.
+파일은 `local effect = {}; function effect:init(api) ... end; function effect:update(context) ... end; return effect` 형식이다. self는 해당 인스턴스의 테이블이다. init에서만 `api:parameter{name=string,type="boolean"|"int"|"float"|"haptic_power",default=...}`를 등록한다. int/float은 min/max/step이 필수이며 값은 유한하고 범위 안이어야 한다. int는 기본값·범위·step·저장값 모두 정수다. 이전 형식의 type 누락은 boolean/float으로 해석해 호환한다. 이름 중복은 오류다. `api:output(name)`은 이름 문자열 포트를 등록한다.
 
 update의 `context.parameters`는 default→global→현재 기체 합성값이다. `context:log(text)`, `context:vibrate(name,constant(strength),duration_ms)`, `context:vibrate(name,pwm{strength=...,on_ms=...,period_ms=...},duration_ms)`, `context:vibrate(name,off())`를 제공한다. 세기는 정수 0–255, 기간은 0초과 60000ms 이하, PWM은 0≤ON≤period≤60000, period≥20ms다. OFF에는 기간이 없다. 정상 콜백이 끝난 뒤 명령 전체를 적용하며 오류 시 해당 효과 출력을 해제한다.
 
@@ -39,9 +39,69 @@ HID 20ms. 기간은 update now+duration으로 교체한다. PWM 시간은 floor(
 
 ## 연동 근거
 
-- [MSFS 2024 SimConnect](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simconnect/simconnect-sdk/): 동적 로드로 Open/Close/AddToDataDefinition/RequestDataOnSimObject/GetNextDispatch/SubscribeToSystemEvent 사용. SDK 미설치로 공식 공개 ABI 최소 선언을 사용한다. DLL은 Settings 경로를 우선하고, 미설정 시 EXE 옆 → MSFS2024_SDK → 기본 SDK 폴더를 탐색한다. 공식 SDK 클라이언트를 로컬 Release에만 복사한다. 공개 dist에는 Microsoft DLL을 포함하지 않는다(SIMCONNECT-LICENSING.md).
+- [MSFS 2024 SimConnect](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simconnect/simconnect-sdk/): 동적 로드로 Open/Close/AddToDataDefinition/RequestDataOnSimObject/GetNextDispatch/SubscribeToSystemEvent 사용. SDK 미설치로 공식 공개 ABI 최소 선언을 사용한다. DLL은 EXE 옆 SimConnect.dll만 로드한다. 공식 SDK 클라이언트를 로컬 Release/dist에 복사한다. 공개 재배포 권리 확인은 SIMCONNECT-LICENSING.md를 따른다.
 - [수신 ID](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simconnect/api-reference/structures-and-enumerations/simconnect_recv_id/): EXCEPTION=1. Aurora의 5 선언을 그대로 복사하지 않는다. [자료형 정의](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simconnect/api-reference/structures-and-enumerations/simconnect_datatype/)에 따라 STRING256=9이며 Aurora의 12 선언도 사용하지 않는다.
 - [기어 변수](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/aircraft-simvars/aircraft-brake-and-landing-gear-variables/): GEAR IS ON GROUND:0/1/2 Bool, GEAR ANIMATION POSITION:0/1/2 Percent. ABSOLUTE TIME Seconds, GROUND VELOCITY Knots, SIM ON GROUND Bool, TITLE STRING256.
-- HID: Aurora `src/hid/protocol.rs` 및 HANDOFF. VID 4098/PID B970, Left=(04,0E), Right=(08,10). `[reportID,ident,B9,0,0,03,49,address,strength,0,0,0,0,0]`, reportID=02를 descriptor에서 확인하고 최소 길이14를 요구한다. 다른 장치는 출력하지 않는다. 비동기 WriteFile 완료/실패를 확인하고 제한 시간 초과 시 취소한다.
+- HID: Aurora `src/hid/protocol.rs` 및 HANDOFF. VID 4098/PID B970은 Left=(04,0E), Right=(08,10). `[reportID,ident,B9,0,0,03,49,address,strength,0,0,0,0,0]`, B970은 reportID=02를 descriptor에서 확인한다. 모든 지원 장치는 길이≥14, UsagePage=1/Usage=4를 요구한다. 다른 모델의 목록·형식은 아래 확장 계약을 따른다. 비동기 WriteFile 완료/실패를 확인하고 제한 시간 초과 시 취소한다.
 
-저장과 Apply는 분리한다. 편집 초안은 저장해도 실행되지 않는다. Apply는 모든 대상 효과를 새 Lua 상태에서 검증한 뒤 교체하며 실패하면 기존 버전 유지. Disable과 Stop은 즉시 반영한다.
+## 편집·파일 추적·자동 실행
+
+File에 New/Open/Open Recent/Save/Save All/Close File/Close Project를 둔다. 시작 시 last_project만 복원하며 파일이 없으면 프로젝트 없는 상태다. Save는 현재 스크립트와 해당 효과의 글로벌/모든 기체 설정만 저장한다. 다른 효과의 초안은 저장하지 않는다. Save All은 전체 저장한다. 스크립트는 기체 공통이며 Parameters 상단의 편집 기체 선택은 코드 저장에 영향을 주지 않는다.
+
+파라미터는 즉시 합성·적용하며 Lua self를 유지한다. 코드 저장 또는 외부 파일 내용 변경은 해당 효과만 검증·교체한다. 각 효과의 모든 프로필을 검증하고 실패하면 그 효과의 이전 유효 버전을 유지한다. 다른 효과의 갱신을 막지 않는다. 코드 초안은 실행하지 않는다. 출력 경로/활성화 변경은 해당 요청을 정리한다. PWM 설정 변경은 활성 PWM 위상을 보존한다.
+
+effects 하위 Lua를 1초마다 추적한다. 누락 경로와 새 경로가 같은 파일명으로 각각 유일하게 대응되면 ID·설정을 이전한다. 대응되지 않는 누락 효과와 모든 기체 Override는 삭제한다. 새 경로는 새 ID, enabled=true, 빈 parameters/outputs(스크립트 기본값·미배정 출력)로 등록한다. 구조 변경만 자동 저장하고 다른 효과의 파라미터 초안은 저장하지 않는다. 실제 파일 목록은 QFileSystemModel로 갱신한다. 프로젝트 JSON의 외부 동시 편집 병합은 제공하지 않는다. 삭제 파일의 미저장 코드 버퍼는 보존하지만 효과 설정은 삭제한다. 사용자가 버퍼를 Save하여 파일을 재생성하면 새 효과/기본값으로 등록된다.
+
+MSFS는 미연결 시 2초마다 재시도한다. 연결 중에는 [RequestSystemState](https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/General/SimConnect_RequestSystemState.htm)의 Sim 요청을 2초 간격으로 보내고 응답이 5초간 없으면 재연결한다. 이 응답은 텔레메트리 수신/유효 시각을 바꾸지 않는다. HID는 1초마다 재검색한다. 기존 HID 핸들은 유지한다. 실행은 기본 활성 상태이며 유효한 프로젝트·입력·매핑·효과 요청이 있을 때만 출력한다. Stop All은 요청/테스트를 해제하고 Resume All 전까지 게임 출력을 차단한다. 프로젝트 전환은 출력을 정리하되 전체 중지 선택은 유지한다. 테스트 창 열기만으로 새 테스트 출력을 만들지 않는다.
+
+## haptic_power 파라미터
+
+```lua
+api:parameter {
+    name="Power", type="haptic_power",
+    default={strength=20, pwm=false, on_ms=20, period_ms=80},
+    min=0, max=255
+}
+```
+
+default 테이블은 필수. 테이블 내 생략값은 strength=0, pwm=false, on_ms=20, period_ms=80이다. min/max는 선택이며 0/255가 기본, 정수 0..255 안으로 제한한다. strength는 지정 범위 내 정수, PWM은 boolean, ON/period는 정수 ms이며 0≤ON≤period, 20≤period≤60000이다. UI는 강도 슬라이더+직접 숫자 입력, PWM 체크, 체크 시 ON/period 입력을 표시한다. 실행 시간은 기존 20ms 반올림 규칙을 따른다. 일반 숫자도 슬라이더+직접 입력이며 step은 슬라이더/증감 간격이다(직접 입력값을 step 배수로 강제하지 않는다). 슬라이더 분할은 최대 1,000,000이다.
+
+저장 및 context.parameters의 Power는 `{strength:20,pwm:false,on_ms:20,period_ms:80}` 객체다. 복합 파라미터 하나가 상속·Override의 단위이며 내부 필드별 부분 상속은 하지 않는다. Reset All to Global은 선택 효과의 현재 기체 Override 전체를 지운다. 예제는 이 객체에서 constant/pwm 사양을 만들며 파형 선택·게임 판단은 Lua에 남긴다.
+
+## 도킹 UI·HID 확장 (2026-11-10)
+
+View 메뉴의 Project Explorer / Effect Control / Motor Monitor / Debug Output은 각 QDockWidget 표시 상태를 제어한다. Effect Control에 Parameters/Script Editor를 함께 둔다. 상태는 local.json layout에 보존하며 layout_version=2는 새 기본 크기 배치의 적용 여부다. 숨김은 실행 중지를 의미하지 않는다. Monitor는 연결 모터만 Motor/Slots/HID 세 열로 표시한다. HID는 마지막 성공 전송 강도이며 20ms UI 갱신은 하드 실시간/모든 펄스 관측 보장이 아니다. 연결 해제 후 PC 매핑 예약은 유지한다.
+
+Aurora protocol.rs의 11개 PID를 허용한다(모두 VID 4098): BC27–BC2C, B920, B930, B970, BEA8, BD64. 스틱 category=Stick, 스로틀 category=Throttle. 기존 B970 모터 키/좌우 매핑은 유지한다. 스틱은 /Stick, Orion 스로틀은 /Combined 한 출력이며 URSA 스로틀은 /Left와 /Right다.
+
+공통 프레임은 `[report,identifier,command,0,0,03,49,address,strength,0,0,0,0,0]`, descriptor 길이까지 0 패딩한다. BC27–BC2C는 identifier=07–0C, command=BF, address=00. B920/B930은 identifier=10, command=B9, address=Left 0E/Right 10. B970은 기존 (04,0E)/(08,10), command=B9. BEA8은 identifier=01, command=00, address=00. BD64는 identifier=01/address=00에서 command=BF와 CF 두 보고서에 같은 선택 강도를 보낸다. 별도 Left/Right 제어로 가장하지 않는다.
+
+B970 이외에는 Aurora의 최소 비영(없으면 0) output report ID 선택을 따르되 value/button caps에서 실제 확인된 ID만 사용한다. descriptor 조회 실패 시 14/02를 추정하는 Aurora fallback은 사용하지 않는다. 알려지지 않은 PID, 호환되지 않는 descriptor, 쓰기 접근 실패를 로그로 알려주며 같은 오류를 매 스캔마다 반복하지 않는다. 부분 전송 실패도 출력을 시도한 장치로 기억해 재연결 후 필요하면 0 전송을 재시도한다. 이는 실제 물리 정지 확인을 뜻하지 않는다.
+
+## 단일 Explorer·파일 탭·JSON 편집 (2026-11-10 후속)
+
+QFileSystemModel 기반 트리에서 등록된 Lua만 CheckStateRole을 가진다. 체크박스는 현재 편집 프로필의 enabled를 수정하고 바로 반영한다. 디렉터리 체크/일괄 활성화는 제공하지 않는다. 상태 갱신은 dataChanged로 전달하고 모델/트리를 초기화하지 않아 펼침 상태를 유지한다.
+
+Effect Control 최상단 QTabBar와 편집 문서 QStackedWidget은 동일 순서·선택을 유지한다. 탭 아래에 공통 Parameters/Script Editor 분할 영역을 둔다. 각 파일 탭은 별도 Editor/QTextDocument를 갖는다. 상대 경로로 탭을 식별하고 이동 감지 시 해당 탭의 경로를 바꾸며 커서·undo를 유지한다. raw `.sv`에서는 Parameters를 숨기고 자동 생성 파일 안내와 JSON 강조를 표시한다. 루트 프로젝트 파일과 로드된 aircraft 파일의 저장만 허용한다.
+
+raw Save는 열린 시점(또는 마지막 자동 갱신)의 디스크 문자열을 기준으로 충돌을 검사한다. JSON 초안 전체를 4MiB 이내 객체로 파싱하고, 실제 파일을 쓰기 전에 해당 객체들을 대입한 Project::load로 프로젝트/모든 기체 스키마를 검증한다. 성공 후 해당 파일만 QSaveFile로 쓰고 메모리 Project와 실행 설정을 다시 반영한다. Save All의 복수 JSON도 모두 검증한 뒤 저장하되 다중 파일 저장 전체가 트랜잭션인 것은 아니다. 문법/스키마 오류는 초안과 원본을 유지한다. Lua의 범위/실행 검증 실패는 기존 효과별 오류 격리 규칙을 따른다.
+
+파라미터 초안이 있으면 raw 문서는 읽기 전용이고, raw 초안이 있으면 파라미터/체크 변경 및 effects 구조 자동 반영은 보류한다. 마지막 유효 실행은 유지한다. raw 문서를 수정하지 않았으면 자동 생성 저장 시 열린 문서도 갱신한다. 코드 초안과 JSON 초안은 동시에 열 수 있다. JSON 저장 시 Lua 코드 초안은 저장하지 않는다.
+
+Monitor 셀 동작은 Slots=매핑, HID=테스트(우클릭/더블클릭). 목록은 logicalSlots의 최소 매핑 인덱스 → 대소문자 무시 장비 이름 → 장치 ID순이며 미배정은 마지막이다. 선택은 행 번호가 아닌 ID로 복원하므로 재정렬 중 다른 모터로 바뀌지 않는다. 테스트는 여전히 명시적 Start가 필요하다.
+
+## 최소 설정 표현·수정 상태 (2026-11-10 후속)
+
+프로젝트 enabled 누락은 true다. 글로벌 파라미터 누락은 Lua default, 출력 이름 누락은 빈 목적지 목록이다. Specific 누락은 global/default 합성값을 상속한다. Global에서 default와 동일한 항목, Specific에서 현재 global 합성과 동일한 항목은 생략한다. 출력 배열과 haptic_power 객체는 전체 값 단위로 비교한다. enabled=false 또는 outputs=[]도 상위와 다르면 명시값으로 보존한다. 빈 parameters/outputs 그룹, 빈 효과 Override는 제거한다. 알 수 없는 파라미터/출력은 기본값을 추정해 제거하지 않는다.
+
+UI 설정 조절/메타데이터 확인 시 최소 표현으로 정리하고 일반 Save/Save All에서 파일에 반영한다. 스크립트 오류로 기본값을 읽지 못하면 해당 설정은 보존한다. raw JSON의 개별 Save는 입력 문서를 보존하며 다음 일반 저장에서 알려진 중복값을 정리한다. Specific이 글로벌과 같아져 제거되면 이후 글로벌 변경을 따라간다(동일값 고정 Override는 유지하지 않음).
+
+dirtyEffects는 최소 표현으로 정리한 현재 효과/모든 기체 Override와 저장 기준의 차이로 매번 계산한다. 단순히 값을 한번 바꿨다는 이유로 수정 표시를 유지하지 않는다. Lua/JSON 초안도 Editor의 저장 텍스트와 같아지면 제거하며 CRLF/LF에 따른 편집기 내부 줄바꿈 정규화를 반영한다. 저장된 스크립트 기본값이 바뀌면 메타데이터 캐시를 갱신한다.
+
+표시는 Default/Global/Specific 세 단계이며 각 행에 현재 편집 범위에 맞는 Reset to Default 또는 Reset to Global을 둔다. Power는 가로 한 줄(PWM 체크 시 ON/Period 노출), Outputs는 출력명 헤더와 목적지 셀 한 행으로 구성한다. 여러 목적지는 개행하여 표시하고 가로 폭을 넘는 출력은 스크롤한다.
+
+### haptic_power 출력 사양 직접 사용
+
+vibrate의 두 번째 인수는 기존 mode='constant'/'pwm'/'off' 사양 또는 haptic_power 객체다. mode가 없으면 필수 boolean pwm이 false일 때 Constant, true일 때 PWM으로 해석한다. strength는 정수 0–255, PWM이면 on_ms/period_ms를 기존 규칙으로 검증·양자화하며 duration_ms와 요청 교체 규칙도 동일하다. 명시적 mode는 pwm보다 우선한다. 전달 객체를 수정하지 않으며 파라미터 상속은 기존 configure 단계에서 완료된다. 예: `context:vibrate("Left Gear", context.parameters.Power, 150)`. 동적 파형 작성에 쓰는 기존 헬퍼 API는 변경하지 않는다.
+
+Reset All은 선택 효과의 편집 프로필에 한정한다. Global은 enabled/parameters/outputs를 제거해 기본값을 상속하고, Specific은 해당 효과 Override 전체를 제거해 Global을 상속한다. 다른 효과와 Lua 소스는 변경하지 않는다.

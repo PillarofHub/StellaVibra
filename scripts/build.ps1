@@ -1,13 +1,16 @@
-param([switch]$Deploy)
+param([switch]$Deploy, [switch]$Detailed)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+$log = Join-Path $root 'build/build.log'
+New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
+function Invoke-StellaBuild {
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { throw 'MSVC Build Tools are required' }
 $cmake = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
 & $cmake -S $root -B "$root\build" -G 'Visual Studio 18 2026' -A x64 "-DCMAKE_PREFIX_PATH=$root/.deps"
 if ($LASTEXITCODE) { throw 'CMake configure failed' }
-& $cmake --build "$root\build" --config Release -- /m:1 /nr:false
+& $cmake --build "$root\build" --config Release -- /m:1 /nr:false /nologo /verbosity:minimal
 if ($LASTEXITCODE) { throw 'Build failed' }
 # Release is always a runnable app-local layout; -Deploy additionally creates dist.
 $destinations = @("$root\build\Release")
@@ -26,12 +29,30 @@ foreach ($destination in $destinations) {
     Copy-Item "$root\.deps\qtbase-everywhere-src-6.8.3.tar.xz","$root\.deps\lua-5.4.8.tar.gz" "$destination\sources" -Force
     Copy-Item "$root\README.md" $destination -Force
     Copy-Item "$root\SIMCONNECT-LICENSING.md" $destination -Force
-    # This SDK client is for this developer's local build, not the public package.
+    # Local runnable staging includes the SDK client. Public redistribution rights remain unresolved.
     $localClient = "$root\.deps\msfs2024\client\SimConnect.dll"
-    if ($destination -eq "$root\build\Release" -and (Test-Path $localClient)) {
+    if (-not (Test-Path $localClient)) { throw 'Official SDK client missing: .deps/msfs2024/client/SimConnect.dll (see SIMCONNECT-LICENSING.md)' }
+    if (Test-Path $localClient) {
         if ((Get-FileHash $localClient -Algorithm SHA256).Hash -ne 'B10DE7ADF4C62E5F66C89DD6D01B64091BBBCEC83411CFE191D6B85FBEE61D15') { throw 'Unexpected local SDK client checksum' }
         Copy-Item $localClient $destination -Force
         Copy-Item "$root\.deps\msfs2024\client\provenance.json" "$destination\SimConnect-provenance.json" -Force
         Copy-Item "$root\.deps\msfs2024\client\MSFS SDK EULA.pdf" "$destination\licenses" -Force
     }
+}
+}
+try {
+    if ($Detailed) { Invoke-StellaBuild }
+    else { Invoke-StellaBuild *> $log }
+    Write-Host "Build/deploy succeeded. $root\build\Release\StellaVibra.exe"
+    if (-not $Detailed) { Write-Host "Log: $log" }
+} catch {
+    $failure = $_.Exception.Message
+    if (-not $Detailed -and (Test-Path $log)) {
+        $errors = @(Select-String -Path $log -Pattern '(?i)error|fatal|failed|오류' | Select-Object -Last 12 | ForEach-Object { $_.Line })
+        if ($errors.Count) { $errors | Write-Host }
+        else { Get-Content $log -Tail 12 | Write-Host }
+    }
+    Write-Host "Build/deploy failed: $failure"
+    if (-not $Detailed) { Write-Host "Full log: $log" }
+    exit 1
 }

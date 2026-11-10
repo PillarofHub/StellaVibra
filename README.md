@@ -18,15 +18,15 @@ Windows용 Lua 기반 햅틱 효과 편집·실행 도구. 제품 UI는 영어, 
 
 | 위치 | 화면 | 기능 |
 | --- | --- | --- |
-| 상단 | Toolbar | 프로젝트 열기, Run/Stop, 현재 기체와 편집 프로필 |
-| 좌측 | Project Explorer | 실제 폴더 트리, 효과 등록·활성화, 오류 표시 |
-| 중앙 위 | Parameters | 자동 생성 파라미터, 출력별 목적지, 상속 출처, Reset to Global |
-| 중앙 아래 | Script Editor | Lua 편집, 행 번호, 문법 강조, 검색, 저장, Apply |
-| 우측 | Motor Monitor | 실제 장치·모터, 매핑, 전송 출력, Test |
-| 하단 | Output | 효과별 로그·오류, 필터, Clear, 오류 위치 이동 |
+| 상단 | File / Edit / View 메뉴 | 프로젝트·저장 / Undo·Redo / 네 도킹 창 표시·숨기기 |
+| 좌측 | Project Explorer | 단일 폴더 트리, Lua 파일 옆 활성화 체크박스, 접기·펼치기, 오류 표시 |
+| 중앙 위 | Parameters | Global/Specific Aircraft 선택, 슬라이더·수치 입력, 출력 목적지, 모드별 개별/전체 Reset |
+| 중앙 아래 | Script Editor | 파일별 탭, Lua/JSON 편집, 행 번호, 문법 강조, 검색, 저장 시 적용 |
+| 우측 | Motor Monitor | 슬롯순 모터 목록, Slots 셀 매핑, HID 셀 테스트, Stop All/Resume All |
+| 하단 | Debug Output | 효과별 로그·오류, 필터, Clear, 오류 위치 이동 |
 | 최하단 | Status Bar | 게임·장치 연결과 실행 상태 |
 
-좌우·하단은 도킹 패널, 중앙은 상하 분할이다. 창 배치는 로컬에 저장한다. 현재 출력에 적용되는 기체와 편집 중인 프로필을 분리한다. 프로젝트 열기·장치 연결만으로 실행하지 않으며 시작 상태는 Stopped다.
+Project Explorer, Effect Control, Motor Monitor, Debug Output은 도킹 창이며 View 메뉴에서 각각 표시·숨기기를 바꾼다. Effect Control 최상단 파일 탭 아래에 Parameters/Script Editor를 위아래로 묶는다. 두 영역 모두 선택한 파일에 속하며 분할선을 끌어 높이를 조절한다. 창의 X로 닫아도 View에서 다시 열 수 있고, 창을 숨겨도 실행은 중지되지 않는다. 창 배치는 로컬에 저장한다. 현재 출력에 적용되는 기체와 편집 중인 프로필을 분리한다. MSFS·지원 HID를 자동 연결하고 유효한 텔레메트리와 활성 효과가 있으면 자동 실행한다. Motor Monitor의 Stop All/Resume All이 전체 출력을 제어한다. 연결 자체나 테스트 창 열기는 진동 명령을 생성하지 않는다. 이전의 시작 시 Stopped 규칙은 이번 자동 실행 요청으로 변경되었다.
 
 ## 프로젝트와 설정
 
@@ -50,7 +50,7 @@ My Flight Project/
 | aircrafts/*.sv | 형식 버전, 기체 식별 정보, 효과 인스턴스 ID별 Override |
 | 프로그램 로컬 설정 | 물리 모터와 논리 슬롯의 매핑, 장치 식별·미배정 기록, UI 배치 |
 
-파라미터 정의와 기본값은 Lua에 두고 프로젝트에는 선택한 값을 저장한다. 파일 이동 후에도 효과 인스턴스 ID는 유지한다. 동일 Lua 파일의 다중 인스턴스 UI는 MVP에서 제외한다. effects 폴더에 복사한 파일은 탐색기에 나타나지만 Add to Project로 등록해야 실행 대상이 된다.
+파라미터 정의와 기본값은 Lua에 두고 프로젝트에는 선택한 값을 저장한다. effects 하위 폴더를 1초마다 추적해 Lua 파일을 자동 등록한다. 같은 파일명인 누락 항목과 신규 경로가 각각 하나일 때 ID·글로벌·기체 설정을 이전한다. 이름까지 바뀌거나 대응이 모호하면 기존 항목과 기체 Override를 삭제하고 새 파일을 기본값/빈 출력 매핑으로 등록한다. 삭제 파일의 복구용 설정은 남기지 않는다. 동일 Lua의 다중 인스턴스는 제외한다.
 
 ### 기체별 상속
 
@@ -58,7 +58,7 @@ My Flight Project/
 
 - 기체 파일에는 활성화, 개별 파라미터, 출력 이름별 목적지의 변경값만 저장한다.
 - 누락은 상속, false는 명시적 비활성화, 빈 목적지 목록은 출력 없음이다. 출력 목록은 해당 이름 단위로 전체 교체한다.
-- Reset to Global은 Override를 삭제한다. 글로벌과 우연히 같은 값이 되어도 명시적 Override를 자동 삭제하지 않는다.
+- Reset to Global은 Override를 삭제한다. Specific 값이 글로벌 합성값과 같으면 Override를 제거한다. Global 값이 스크립트 기본값과 같으면 해당 저장 항목을 제거한다. Global에서는 Reset to Default를 제공한다.
 - 어댑터의 정확한 기체 키로 매칭한다. 파일명·부분 이름·와일드카드로 추정하지 않는다. 미등록 기체는 Global, 중복 매칭은 오류로 처리한다.
 - 다른 기체 편집은 현재 실행 프로필을 바꾸지 않는다. 첫 Override 저장 시 기체 파일을 생성한다.
 
@@ -83,6 +83,7 @@ init은 파라미터·출력 목록을 등록하고 상태를 초기화한다. �
 function effect:init(api)
     api:parameter {
         name = "Strength",
+        type = "int",
         default = 20,
         min = 0,
         max = 255,
@@ -93,7 +94,7 @@ function effect:init(api)
 end
 ```
 
-parameter는 boolean 또는 min/max/step이 있는 number를 등록한다(CONTRACTS.md). output은 표시명·호출 키·저장 키를 겸하는 문자열 하나다. 효과 내 이름은 고유해야 한다. 출력마다 UI가 논리 목적지 선택 행을 만들며 여러 목적지 또는 빈 목록을 허용한다. 출력 이름 변경은 설정 키 변경이므로 연결을 추측 이전하지 않는다.
+parameter는 type="boolean"/"int"/"float"/"haptic_power"와 default를 등록한다. 숫자는 min/max/step이 필요하다. haptic_power는 strength, pwm, on_ms, period_ms를 묶으며 강도 기본 범위 0–255, 기본 PWM 시간 20/80ms다. 복합 기본값과 선택적 min/max를 스크립트가 지정한다(CONTRACTS.md). output은 표시명·호출 키·저장 키를 겸하는 문자열 하나다. 효과 내 이름은 고유해야 한다. 출력마다 UI가 논리 목적지 선택 행을 만들며 여러 목적지 또는 빈 목록을 허용한다. 출력 이름 변경은 설정 키 변경이므로 연결을 추측 이전하지 않는다.
 
 ### 업데이트
 
@@ -167,12 +168,12 @@ Constant 우선은 세기와 별개의 규칙이다. Constant 1도 PWM 200보다
 - 초기 텔레메트리 만료는 500 ms다. 연결 해제, 만료, 기체 변경, Stop, 효과 비활성화·오류·재적용 시 관련 출력을 정리한다.
 - 예약 기한과 런타임 정상 동작 감시는 별개다. 실행기 응답 중단도 출력을 해제해야 하며 실행기 heartbeat 제한은 250ms다. 정상 효과는 같은 출력을 계속 재요청할 필요가 없다.
 - UI·Lua 실행과 HID 루프를 분리한다. 스크립트 실행 지연이 출력 만료나 Stop을 막지 않게 한다.
-- Motor Monitor는 실제 진동 측정값이 아닌 전송 명령과 연결·오류 상태를 표시한다.
+- Motor Monitor는 연결된 모터만 표시한다. Motor 이름 열은 넓게, HID 열은 52px로 표시하고 Status/Connected 열은 제거했다. HID는 마지막 전송에 성공한 0–255 강도이며 20ms 간격 UI 스냅샷이다(장치 입력 축이나 실측 진동이 아님). 연결 해제 시 행을 숨기되 매핑은 예약한다. 오류는 Debug Output에 기록한다.
 - 모터 테스트는 명시적 Start와 제한 시간을 요구한다. 테스트 모터의 게임 출력을 잠시 제외하고 같은 엔진으로 구동한다. 전역 Stop은 테스트도 중단한다.
 
 ## 편집과 적용
 
-저장과 Apply를 분리한다. 코드·파라미터 초안은 Apply 전까지 실행 버전과 구분한다. 검증 성공 시 관련 효과를 교체·초기화하며 실패하면 실행 버전을 유지하고 오류를 표시한다. Disable과 전역 Stop은 즉시 적용한다.
+파라미터·활성화·매핑 수정은 즉시 실행에 반영하며 저장은 별도다. 파라미터 변경은 기존 Lua self와 PWM 위상을 유지한다. 스크립트는 저장 시 해당 효과만 검증·교체한다. 오류는 로그에 표시하며 해당 효과의 기존 유효 버전은 유지하고 다른 효과의 수정은 계속 반영한다. 저장하지 않은 코드 초안은 실행하지 않는다. Ctrl+S는 현재 스크립트와 그 효과의 글로벌/기체 설정만 저장하고, Ctrl+Shift+S는 전체 저장한다. Close File은 편집 파일만 닫으며 효과를 비활성화하지 않는다.
 
 프로젝트 전환·재초기화 시 호스트가 출력·예약·상태를 정리하고 이전 인스턴스의 지연 명령을 폐기한다. 파일은 임시 파일을 통한 교체로 저장한다. 사라진 파라미터·출력 이름의 설정은 조용히 삭제하지 않고 미해결 항목으로 표시한다. 지원하지 않는 상위 파일 형식 버전은 거부한다.
 
@@ -184,30 +185,76 @@ Ground Roll은 이동·접촉 조건을 만족하면 지정 세기를 요청한�
 
 ## 구현 및 실행 (2026-11-09)
 
-- 대상: MSFS 2024. SDK는 로컬에 설치되어 있지 않다. 공개 SimConnect ABI를 동적 로딩한다. Connect MSFS에서 설정 경로를 우선 사용하고, 설정이 없으면 EXE 옆 DLL → MSFS2024_SDK → 기본 SDK 폴더를 자동 탐색한다. 로컬 Release에는 공식 SDK에서 추출한 개발용 DLL을 복사하며 공개 배포용 dist에는 포함하지 않는다. 자세한 근거는 SIMCONNECT-LICENSING.md를 따른다. DLL 없이도 앱·프로젝트·Lua 편집은 사용할 수 있다.
-- HID MVP 지원: Combat Throttle Metal.EX, VID `4098` / PID `B970`, Left=A / Right=B. 다른 모델에는 출력하지 않는다. 자동 배정은 고유 일련번호가 있는 장치만 수행하며, 모호한 식별은 매 세션 수동 매핑이 필요하다.
-- 숫자/boolean 파라미터, 이름 기반 다중 출력, 글로벌/기체 변경값 저장, 실제 폴더 탐색기, Lua 편집·행 번호·강조·검색, 로그 필터/오류 위치 이동, Motor Monitor와 제한 시간 테스트를 구현했다.
-- 기체 선택 목록의 Global은 편집 프로필이다. 실제 실행은 수신된 정확한 TITLE에 일치하는 Override를 자동 선택한다. 이미 등록된 기체와 현재 수신 기체를 편집할 수 있다.
-- New는 빈 폴더에 프로젝트와 두 Lua 예제를 만든다. effects의 외부 파일은 Add to Project로 등록한다. Save는 파일 저장, Apply는 메모리 초안을 검증해 실행 버전으로 교체한다. 오류 시 기존 실행 버전을 유지하지만, 프로젝트를 전환한 경우 이전 프로젝트는 실행할 수 없다.
-- 시작 시 자동 연결·HID 스캔·모터 출력은 하지 않는다. Connect MSFS / Scan Devices는 명시적 버튼이다. Scan과 연결 변경은 Stop 처리한다. 예제 출력은 Left Gear→Throttle:1, Right Gear→Throttle:2이며 Center Gear는 기본 미배정이다.
+- MSFS 2024 연결은 2초마다 재시도한다. Settings 없이 EXE 옆 공식 `SimConnect.dll`만 로드한다. 게임 내부 DLL이나 PATH를 검색하지 않는다.
+- HID는 1초마다 검색하고 연결 유지 중인 장치 핸들은 재사용한다. 지원 목록은 아래 WINCTRL HID 표를 따른다. Aurora에 정의된 장치별 프로토콜만 사용하며, 미등록 PID에는 출력하지 않는다. 일련번호 없는/중복 장치는 세션 내 수동 매핑이 필요하다.
+- 마지막 프로젝트를 시작 시 복원한다. 해당 파일을 못 찾으면 빈 화면이며 다른 최근 프로젝트를 대신 열지 않는다. File → Open Recent에서 최근 10개를 열 수 있다.
+- Explorer는 파일 트리 하나다. 등록된 Lua 옆 체크박스는 Parameters에서 선택한 프로필의 enabled를 제어한다. 폴더를 접고 펼칠 수 있고, 파일 더블클릭으로 탭을 연다. 탭은 이동·닫기가 가능하며 미저장 파일/설정은 *로 표시한다.
+- Parameters 상단에서 Global 또는 Specific Aircraft: TITLE을 선택한다. 실제 실행 기체는 수신된 TITLE로 결정된다. Global의 Reset All to Default는 선택 효과의 글로벌 활성화/파라미터/출력 설정을 지워 기본값(true/등록 기본값/빈 출력)으로 되돌린다. Specific의 Reset All to Global은 선택 효과의 해당 기체 Override 전체를 제거한다. 스크립트는 기체와 무관한 공통 파일이다.
+- New Project는 빈 폴더에 Ground Roll, Touchdown을 만든다. 두 예제는 haptic_power를 사용한다. Left Gear→Throttle:1, Right Gear→Throttle:2, Center Gear는 기본 미배정이다.
 
 ### 빌드와 배포
 
-MSVC Build Tools 2026 (19.51), Windows SDK 10.0.26100.0, 포함 CMake를 사용했다. 프로젝트 로컬 `.deps`는 Git에서 제외한다.
+MSVC Build Tools 2026 (19.51), Windows SDK 10.0.26100.0, 포함 CMake를 사용한다. `.deps`는 Git에서 제외한다.
 
 ```powershell
 .\scripts\bootstrap.ps1
 .\scripts\build.ps1 -Deploy
 ```
 
-`build.ps1`은 항상 `build\Release`에 Qt DLL·플러그인, MSVC CRT, effects, 라이선스·소스를 배치한다. `-Deploy`는 `dist\StellaVibra`도 만든다. 어느 폴더에서도 `StellaVibra.exe`를 직접 실행할 수 있도록 구성한다. .NET 설치는 필요 없다. 앱 자체는 MIT이며 타사 조건은 별도다.
+`build.ps1`은 `build\Release`에 Qt DLL·플러그인, MSVC CRT, effects, 라이선스·소스와 공식 SimConnect.dll을 배치한다. `-Deploy`는 같은 구성을 `dist\StellaVibra`에도 만든다. 공식 클라이언트가 `.deps/msfs2024/client`에 없으면 배포 단계에서 명시적으로 실패한다. 현재 두 폴더는 로컬 실행·검증용이며, Microsoft DLL의 공개 재배포 권리 확인은 기존 SIMCONNECT-LICENSING.md 검토대로 남아 있다. 앱 소스의 MIT 라이선스와는 별개다.
 
 ### 사용자 수동 검증
 
-1. `build\Release\StellaVibra.exe` 실행 → 시작 상태 Stopped 확인 → New로 빈 폴더에 프로젝트 생성.
-2. 효과 선택 → Lua/파라미터/목적지 편집 → Save → 재열기. 기체 Override와 Reset to Global, Apply 실패 시 오류 표시를 확인.
-3. 로컬 Release는 동봉한 개발용 DLL 사용(다른 위치는 Settings에서 선택) → MSFS 2024 비행 진입 → Connect MSFS. TITLE, pause, 입력 만료·연결 해제 상태를 확인.
-4. Scan Devices → 장치·좌우·논리 슬롯 확인. Test에서 낮은 세기와 짧은 시간으로 명시적 Start 후 종료·Stop 확인.
-5. Apply 성공 로그 확인 → Run → Ground Roll, Touchdown 첫 상승·바퀴별 재무장·중복 샘플을 확인. Stop/일시정지/기체 변경/연결 해제 후 출력 해제 확인.
+1. `build\Release\StellaVibra.exe` 실행 → File/New Project → 두 스크립트를 열고 서로 다른 초안을 만든 뒤 하나만 저장, 다른 초안 유지와 Save All 확인. 재시작 복원과 없는 마지막 프로젝트의 빈 화면 확인.
+2. effects 아래 폴더로 파일 이동 → 설정 유지 확인. 파일명 변경·삭제 → `.sv`와 기체 파일에서 이전 효과 설정 삭제 확인.
+3. 숫자 슬라이더/입력, PWM 체크와 ON/Period, 기체 Override와 Reset All to Global 확인. 저장하지 않은 코드가 실행되지 않고 저장 시 해당 효과만 갱신되는지 확인.
+4. MSFS 시작/종료와 지원 HID 연결/분리 → 상태 자동 갱신 확인. 실제 기체 TITLE, pause, 입력 만료를 확인.
+5. 매핑과 낮은 세기로 Ground Roll/Touchdown, Stop All/Resume All 확인. Touchdown 첫 상승·바퀴별 재무장과 파라미터 조절 중 상태 유지 확인.
 
-컴파일·링크와 정적 의존성 점검만 개발 측에서 수행한다. 실제 GUI, DLL 호환성, SimConnect 수신 레이아웃, 기체별 기어 애니메이션, HID descriptor/좌우·출력 타이밍은 사용자 검증 전이다. 기어 애니메이션은 물리 힘이 아니며 일부 기체에서 정적이거나 의미가 다를 수 있다. 하드웨어 자체 watchdog은 확인되지 않았으므로 프로세스 강제 종료·USB 전송 실패 시 물리 정지까지 보장했다고 주장하지 않는다.
+개발 측 검증은 컴파일·링크·정적 점검이다. GUI, 실제 DLL/게임 연결, 기체별 기어 신호, HID 좌우·진동·타이밍은 사용자 검증 전이다. 강제 프로세스 종료나 드라이버 장애에서 물리 모터 정지는 검증하지 않았다.
+
+## WINCTRL HID 지원 (2026-11-10)
+
+모두 VID `4098`. 기존 스틱 미감지 원인은 `B970`만 허용했던 필터다. 기체 파라미터나 Explorer 숨김과 무관하다. 이번 지원은 Aurora의 `src/hid/protocol.rs`, `worker.rs`, `win32.rs`를 대조해 구현했다. 실제 연결 장치의 PID/descriptor/진동은 실행 검증하지 않았다.
+
+| 모델 | PID | 독립 출력 |
+| --- | --- | --- |
+| URSA MINOR Airbus L / R | BC27 / BC28 | 스틱별 1 |
+| URSA MINOR Combat(Fighter) L / R | BC29 / BC2A | 스틱별 1 |
+| URSA MINOR Space L / R | BC2B / BC2C | 스틱별 1 |
+| URSA MINOR Throttle / Throttle R | B920 / B930 | Left / Right |
+| Combat Throttle Metal.EX | B970 | Left=A / Right=B |
+| Orion Joystick Base II | BEA8 | 1 |
+| Orion Throttle Base II | BD64 | Combined 1 (동일 강도로 두 명령 전송) |
+
+스틱은 Stick:1–4, 스로틀은 Throttle:1–4 빈 슬롯에 자동 배정한다. 예제의 기본 목적지는 여전히 Throttle:1/2이므로 스틱에 출력하려면 효과 출력 목적지에 배정된 Stick 슬롯을 추가한다. 한 모터에는 기존 우선순위로 요청 하나만 선택하며 파형을 합산하지 않는다. 정상 descriptor 없이 보고서 형식을 추정해 전송하지 않는다. 장치 발견/분리·알 수 없는 WINCTRL PID·descriptor 및 쓰기 접근 오류는 Debug Output에서 확인한다.
+
+빌드는 기본적으로 전체 출력을 `build/build.log`에 보관하고 성공 시 결과·로그 경로 두 줄만 표시한다. 실패 시 오류 최대 12줄(오류 추출이 없으면 로그 마지막 12줄)과 경로를 표시하며 실패 코드로 종료한다. `.\scripts\build.ps1 -Deploy -Detailed`는 상세 출력을 콘솔에 표시한다. MSBuild도 `/verbosity:minimal /nologo`를 사용한다.
+
+## 파일 탭과 원시 JSON 편집
+
+Effect Control은 파일별 Editor 문서를 탭으로 연다. 탭 전환 시 커서·스크롤·실행 취소·미저장 초안을 보존하고, 전체 상대 경로를 툴팁으로 표시한다. Lua는 Parameters와 함께, 프로젝트/aircraft `.sv`는 파라미터 없이 JSON 소스로 표시한다. 상단에는 자동 생성 파일이므로 수동 수정을 권장하지 않는다는 안내를 둔다.
+
+JSON 저장은 문법·형식 버전·프로젝트 및 모든 기체 파일의 스키마·중복 기체 키/효과 ID·경로를 검증한 후 수행하고, 저장된 설정을 실행기에 다시 전달한다. Lua 설정 검증/오류 격리는 기존 실행 계약을 따른다. Ctrl+S는 현재 파일, Save All은 모든 초안이다. 열린 JSON이 디스크에서 바뀌면 오래된 초안으로 덮어쓰지 않고 다시 열도록 안내한다.
+
+자동 생성 설정과 raw 편집의 덮어쓰기를 막기 위해, 파라미터 초안이 있으면 먼저 저장/취소한 뒤 JSON을 편집한다. JSON 초안이 있으면 파라미터·활성화 변경과 effects 구조 자동 반영을 잠시 보류한다. 디스크 트리 자체는 계속 갱신된다. JSON 저장/취소 후 자동 추적을 재개한다. JSON 문서를 보기만 하는 것은 추적을 막지 않는다. 직접 수정은 현재 프로젝트와 그 프로젝트의 기체 파일에 한정한다.
+
+Motor Monitor는 Yoke → Stick → Throttle → Pedal(러더) → Wheel, 각 1–4 순서다. 다중 매핑 모터는 가장 앞선 슬롯을 정렬 기준으로 쓰며 같은 슬롯은 장비 이름 오름차순, 동일 이름은 장치 ID순이다. 미배정은 마지막이다. Slots 셀을 우클릭/더블클릭하면 매핑, HID 셀은 모터 테스트 창을 연다. 테스트 창을 열기만 하면 구동하지 않는다. 하단은 Stop All/Resume All만 유지한다.
+
+## 간결한 파라미터와 최소 저장
+
+Power는 강도 슬라이더/숫자, PWM, ON/Period를 한 줄로 표시한다. PWM을 켜면 시간 입력이 같은 행에 나타나고 슬라이더가 남은 폭을 사용한다. ON/Period 단위는 ms다. 각 값 바로 옆의 Default/Global/Specific은 실제 값의 출처다. 체크박스처럼 작은 컨트롤 뒤에 고정 너비 공백을 두지 않는다.
+
+Global에서는 Reset to Default, Specific에서는 Reset to Global로 상위 값을 상속한다. 상위 값과 같아진 enabled/파라미터/출력 항목은 메모리에서 제거하고 저장 시 `.sv`에서도 생략한다. enabled 기본값은 true, 출력 목적지 기본값은 빈 목록이다. 숫자/boolean/haptic_power의 기본값은 Lua 등록값이다. haptic_power는 전체 객체가 상속 단위이므로 숨겨진 PWM 시간도 비교에 포함한다. 빈 그룹과 빈 효과 Override도 제거하며 알 수 없는 설정 키는 보존한다. 기존 중복값은 의미를 유지한 채 일반 Save/Save All에서 정리된다.
+
+수정 표시는 변경 이력의 존재가 아니라 저장 상태와의 차이를 뜻한다. 값을 1→2→1로 돌려 모든 설정이 저장 당시와 같아지거나 Lua/JSON을 실행 취소해 저장 텍스트로 돌아오면 별표와 저장 질문이 해제된다. 다른 파일/프로필에 변경이 남으면 해당 파일 또는 앱의 수정 표시는 유지한다.
+
+Outputs는 출력 이름을 가로 제목으로 하는 표다. 아래 선택 셀에는 여러 목적지를 한 줄씩 표시하고, 셀에서 목적지를 선택한다. 출력별 출처/Reset도 같은 셀 안에 표시한다. 출력이 많으면 가로 스크롤한다.
+
+## Lua 파워 직접 전달과 편집 보조
+
+`context:vibrate(name, parameters.Power, duration_ms)`로 상속이 합성된 haptic_power 객체를 직접 전달한다. mode가 없으면 pwm boolean으로 Constant/PWM을 선택하며 기존 강도·시간 검증, 위상·기한 규칙을 그대로 적용한다. 객체를 변경하지 않는다. 명시적인 mode가 있으면 우선하고 기존 constant/pwm/off 헬퍼도 유지하므로 시간에 따른 강도 계산도 가능하다. 신규 프로젝트용 두 예제는 직접 전달을 사용한다. 기존 프로젝트의 Lua 파일은 자동으로 덮어쓰지 않는다.
+
+File과 View 사이 Edit 메뉴는 활성 Lua/JSON 문서의 Undo(Ctrl+Z), Redo(Ctrl+Y 또는 Ctrl+Shift+Z)를 제공한다. 파라미터 변경 이력을 위한 Undo 스택은 추가하지 않는다.
+
+Lua 편집기는 context: / api: 메서드와 context. / telemetry. / context.telemetry. 필드, telemetry.msfs. 및 gear. / telemetry.gears[index]. 필드를 자동 제안한다. 입력한 접두사로 필터하며 방향키·Enter/Tab으로 선택, Escape로 닫고 Ctrl+Space로 다시 요청한다. 문자열/주석과 JSON에서는 제안하지 않는다. 알려진 이름 기반의 가벼운 보조이며 임의 별칭·사용자 테이블·동적 파라미터명 추론이나 LSP는 제공하지 않는다.
