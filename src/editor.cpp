@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "telemetry.h"
 namespace sv {
 class Gutter : public QWidget { Editor* editor; public: explicit Gutter(Editor* e):QWidget(e),editor(e){} void paintEvent(QPaintEvent* e) override {editor->paintGutter(e);} };
 class Highlight : public QSyntaxHighlighter {
@@ -58,15 +59,28 @@ void Editor::completeMember() {
         }
         ++i;
     }
-    auto match=QRegularExpression(R"((\b(?:context\.telemetry|telemetry)(?:\.msfs|\.gears\[[^\]\n]+\])?|context|api|gear)([:.])([A-Za-z_][A-Za-z_0-9]*|)$)").match(before);
+    auto match=QRegularExpression(R"((\btelemetry(?:\.msfs|\.gears\[[^\]\n]+\])?|parameters(?:\.[A-Za-z_][A-Za-z_0-9]*)?|context|gear)([:.])([A-Za-z_][A-Za-z_0-9]*|)$)").match(before);
     if(!match.hasMatch())return;
     const auto object=match.captured(1),separator=match.captured(2);QStringList names;
-    if(object=="context")names=separator==":"?QStringList{"log","vibrate"}:QStringList{"now_ms","elapsed_ms","telemetry","is_new_sample","telemetry_age_ms","telemetry_valid","parameters"};
-    else if(object=="api" && separator==":")names={"parameter","output","log"};
+    if(object=="context") {
+        const bool inInit=before.lastIndexOf(":init(")>before.lastIndexOf(":update(");
+        names=separator==":"?(inInit?QStringList{"parameter","output","log"}:QStringList{"log","vibrate","now","elapsed","sample_is_new","input_valid"}):QStringList{};
+    }
+
     else if(separator==".") {
         if(object.endsWith(".msfs"))names={"paused"};
         else if(object=="gear" || object.endsWith(']'))names={"contact","animation_percent"};
-        else if(object=="telemetry" || object=="context.telemetry")names={"sample_id","received_ms","sim_time_s","sim_time_advanced","aircraft_key","ground_speed_knots","on_ground","gears","msfs"};
+        else if(object=="telemetry") {names={"sample_id","received_ms","sim_time_advanced","aircraft_key","gears","msfs"};for(const auto& field:simVariables())names<<field.key;}
+        else if(object=="parameters" || object.startsWith("parameters.")) {
+            // Literal registrations in init are sufficient for bundled scripts; no draft execution.
+            auto source=toPlainText();auto init=source.indexOf(QRegularExpression(":init\\s*\\("));
+            if(init>=0){auto end=source.indexOf(QRegularExpression("\\bfunction\\b"),init+1);auto body=source.mid(init,end<0?-1:end-init);
+                auto registrations=QRegularExpression(R"rx(:parameter\s*\{[^}]*?\bname\s*=\s*(["'])([^"']+)\1)rx").globalMatch(body);
+                while(registrations.hasNext()){auto registration=registrations.next();auto key=parameterAlias(registration.captured(2));if(object=="parameters" && luaIdentifier(key))names<<key;
+                    if(object=="parameters."+key){auto tail=body.mid(registration.capturedStart(),body.indexOf('}',registration.capturedStart())-registration.capturedStart());if(QRegularExpression(R"(type\s*=\s*["']haptic_power["'])").match(tail).hasMatch())names={"strength","pwm","on_ms","period_ms"};}
+                }
+            }
+        }
     }
     if(names.isEmpty())return;
     names.sort();candidates->setStringList(names);completion->setCompletionPrefix(match.captured(3));

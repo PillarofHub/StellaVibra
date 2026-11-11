@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <tuple>
 namespace sv {
-Engine::Engine() { runtimeThread=std::thread([this]{runtimeLoop();}); hidThread=std::thread([this]{hidLoop();}); }
-Engine::~Engine() { stop(); quitting=true; runtimeThread.join(); hidThread.join(); }
+Engine::Engine() { if(QCoreApplication::arguments().contains("--ui-check")){running=false;return;}runtimeThread=std::thread([this]{runtimeLoop();}); hidThread=std::thread([this]{hidLoop();}); }
+Engine::~Engine() { stop(); quitting=true; if(runtimeThread.joinable())runtimeThread.join();if(hidThread.joinable())hidThread.join(); }
 void Engine::log(const QString& text) { std::lock_guard lock(mutex); logs<<text; while(logs.size()>1000) logs.removeFirst(); }
 void Engine::apply(Bundle bundle) { std::lock_guard lock(mutex); if(pending)bundle.reloadIds.unite(pending->reloadIds); pending=std::make_unique<Bundle>(std::move(bundle)); }
 void Engine::clearProject() { ready=false; ++projectRevision; ++generation; std::lock_guard lock(mutex); requests.clear(); disabled.clear(); testMotor.clear(); clearRequested=true; pending.reset(); }
@@ -17,10 +17,11 @@ void Engine::mapMotor(QString id,QStringList destinations) { std::lock_guard loc
 void Engine::test(QString motor,Mode mode,int strength,int on,int period,int duration) {
     require(strength>=0 && strength<=255 && duration>0 && duration<=5000 && on>=0 && period>=20 && on<=period,"Invalid motor test");
     std::lock_guard lock(mutex); bool found=false; for(const auto& m:motors) if(m.id==motor && m.connected) found=true; require(found,"Motor not connected");
-    testMotor=std::move(motor); testRequest={"test",{},mode,strength,int(std::floor(on/20.0+0.5))*20,int(std::floor(period/20.0+0.5))*20,nowMs()+duration,nowMs()};
+    testMotor=std::move(motor); testRequest={"test",{},mode,strength,on,period,nowMs()+duration,nowMs()};
 }
+void Engine::setTick(int milliseconds) {require(milliseconds>=5 && milliseconds<=100,"Tick must be 5..100 ms");tickMilliseconds=milliseconds;++generation;std::lock_guard lock(mutex);requests.clear();testMotor.clear();}
 void Engine::stopTest() { std::lock_guard lock(mutex); testMotor.clear(); }
-Snapshot Engine::snapshot() { std::lock_guard lock(mutex); Snapshot s{simStatus,aircraftKey,execution,motors,logs,mappings}; logs.clear(); return s; }
+Snapshot Engine::snapshot() { std::lock_guard lock(mutex); Snapshot s{simStatus,aircraftKey,execution,motors,logs,mappings,latestTelemetry,telemetryConnected}; logs.clear(); return s; }
 static std::vector<std::unique_ptr<LuaEffect>> instantiate(const Bundle& b,const QString& key) {
     std::vector<std::unique_ptr<LuaEffect>> result;
     for(auto value:b.project.data["effects"].toArray()) { auto e=value.toObject(); auto path=e["script"].toString(); if(!b.sources.contains(path))continue; auto instance=std::make_unique<LuaEffect>(e["id"].toString(),b.sources.value(path),path); instance->configure(b.project.resolved(e,key)); result.push_back(std::move(instance)); }
@@ -118,7 +119,7 @@ void Engine::runtimeLoop() {
                 lastUpdate=now;
             }
         } catch(const std::exception& e) { log(QString("Runtime: ")+e.what()); sim.disconnect(); telemetry={}; inputDeadline=0; ++generation; }
-        { std::lock_guard lock(mutex); simStatus=sim.status; }
+        { std::lock_guard lock(mutex); simStatus=sim.status;latestTelemetry=telemetry;telemetryConnected=sim.connected(); }
         heartbeat=nowMs(); std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
@@ -128,7 +129,7 @@ static bool stronger(const Request& a,const Request& b) {
 void Engine::hidLoop() {
     Hid hid; QMap<QString,QString> winners; QSet<QString> touched; auto next=std::chrono::steady_clock::now(); qint64 nextScan=0;
     while(!quitting) {
-        next+=std::chrono::milliseconds(20); bool scan=false;
+        const int tick=tickMilliseconds.load();next+=std::chrono::milliseconds(tick); bool scan=false;
         if(nowMs()>=nextScan)scan=true;
         if(scan) {
             nextScan=nowMs()+1000;
@@ -154,12 +155,14 @@ void Engine::hidLoop() {
             if(!running || now-heartbeat.load()>250 || now>=inputDeadline.load()) requests.clear();
             if(testRequest.deadline<=now) testMotor.clear(); currentMotors=motors; currentRequests=requests; testId=testMotor; test=testRequest;
         }
+        auto quantize=[tick](Request& r){if(r.mode==Mode::Pwm){r.on=int(std::floor(double(r.on)/tick+0.5))*tick;r.period=int(std::floor(double(r.period)/tick+0.5))*tick;if(!r.on || !r.period)r.mode=Mode::Off;}};
+        quantize(test);for(auto& r:currentRequests)quantize(r);
         for(auto& motor:currentMotors) {
             if(!motor.connected) continue;
             const Request* best=nullptr;
-            if(testId==motor.id) best=&test;
+            if(testId==motor.id){if(test.mode!=Mode::Off)best=&test;}
             else for(auto it=currentRequests.begin();it!=currentRequests.end();++it) {
-                bool routed=false; for(const auto& s:motor.destinations) if(it->destinations.contains(s)) routed=true; if(!routed) continue;
+                if(it->mode==Mode::Off)continue;bool routed=false; for(const auto& s:motor.destinations) if(it->destinations.contains(s)) routed=true; if(!routed) continue;
                 if(!best || stronger(*it,*best) || (!stronger(*best,*it) && it.key()==winners.value(motor.id))) best=&*it;
             }
             int strength=0; if(best) { winners[motor.id]=best->key; if(best->mode==Mode::Constant || (best->mode==Mode::Pwm && (now-best->phase)%best->period<best->on)) strength=best->strength; } else winners.remove(motor.id);

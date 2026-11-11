@@ -1,4 +1,5 @@
 #include "lua_effect.h"
+#include "telemetry.h"
 #include <cmath>
 #include <cstdlib>
 #include <lua.h>
@@ -43,13 +44,13 @@ void LuaEffect::initialize() {
         auto bytes=sourceText.toUtf8(); auto name=("@"+sourceName).toUtf8();
         if(luaL_loadbufferx(state,bytes.constData(),bytes.size(),name.constData(),"t")!=LUA_OK) { auto e=QString::fromUtf8(lua_tostring(state,-1)); throw std::runtime_error(e.toStdString()); }
         lua_call(state,0,1); require(lua_istable(state,-1),"Script must return an effect table"); reference=luaL_ref(state,LUA_REGISTRYINDEX);
-        lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"init"); require(lua_isfunction(state,-1),"Missing init(api)"); lua_pushvalue(state,-2); pushApi(); registering=true; lua_call(state,2,0); registering=false; lua_pop(state,1);
-        lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"update"); require(lua_isfunction(state,-1),"Missing update(context)"); lua_pop(state,2);
+        lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"init"); require(lua_isfunction(state,-1),"Missing init(context)"); lua_pushvalue(state,-2); registering=true; pushApi(); lua_call(state,2,0); registering=false; lua_pop(state,1);
+        lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"update"); require(lua_isfunction(state,-1),"Missing update(context, telemetry, parameters)"); lua_pop(state,2);
 }
 LuaEffect::~LuaEffect() { if(state) lua_close(state); }
 void LuaEffect::pushApi() {
     lua_newtable(state); int operation=0;
-    for(auto name:{"parameter","output","log","vibrate"}) { lua_pushlightuserdata(state,this); lua_pushinteger(state,operation++); lua_pushcclosure(state,dispatch,2); lua_setfield(state,-2,name); }
+    for(auto name:{"parameter","output","log","vibrate","now","elapsed","sample_is_new","input_valid"}) { const int code=operation++;if(registering?code>2:code<2)continue;lua_pushlightuserdata(state,this); lua_pushinteger(state,code); lua_pushcclosure(state,dispatch,2); lua_setfield(state,-2,name); }
 }
 int LuaEffect::dispatch(lua_State* L) {
     auto* self=static_cast<LuaEffect*>(lua_touserdata(L,lua_upvalueindex(1)));
@@ -61,13 +62,13 @@ static QString stringAt(lua_State* L,int i) { require(lua_type(L,i)==LUA_TSTRING
 static double numberAt(lua_State* L,int i) { require(lua_type(L,i)==LUA_TNUMBER && std::isfinite(lua_tonumber(L,i)),"Expected finite number"); return lua_tonumber(L,i); }
 static double numberField(lua_State* L,int i,const char* name) { lua_getfield(L,i,name); auto v=numberAt(L,-1); lua_pop(L,1); return v; }
 int LuaEffect::api(lua_State* L,int operation) {
+    if(operation>=4){require(!registering,"Update information is unavailable in init");if(operation==4)lua_pushnumber(L,double(current));else if(operation==5)lua_pushnumber(L,double(previous?current-previous:0));else if(operation==6)lua_pushboolean(L,updateFresh);else lua_pushboolean(L,updateTelemetry.valid(current));return 1;}
     if(operation==0) {
         require(registering && lua_istable(L,2) && parameters.size()<64,"Invalid parameter registration"); Parameter p;
         lua_getfield(L,2,"name"); p.name=stringAt(L,-1); lua_pop(L,1);
         for(const auto& old:parameters) require(old.name!=p.name,"Duplicate parameter");
         lua_getfield(L,2,"type"); if(!lua_isnil(L,-1)) p.type=stringAt(L,-1); lua_pop(L,1);
         lua_getfield(L,2,"default");
-        if(p.type.isEmpty()) p.type=lua_isboolean(L,-1)?"boolean":"float"; // Existing v1 scripts.
         require(p.type=="boolean" || p.type=="int" || p.type=="float" || p.type=="haptic_power","Unknown parameter type");
         p.boolean=p.type=="boolean";
         if(p.boolean) { require(lua_isboolean(L,-1),"Expected boolean default"); p.initial=bool(lua_toboolean(L,-1)); }
@@ -89,6 +90,9 @@ int LuaEffect::api(lua_State* L,int operation) {
             require(p.minimum<=p.maximum && p.step>0 && initial>=p.minimum && initial<=p.maximum && (p.maximum-p.minimum)/p.step<=1000000,"Invalid parameter range");
             if(p.type=="int" || p.type=="haptic_power") require(floor(initial)==initial && floor(p.minimum)==p.minimum && floor(p.maximum)==p.maximum && floor(p.step)==p.step,"Expected integer range/default/step");
         }
+        auto alias=parameterAlias(p.name);
+        require(luaIdentifier(alias),"Parameter name must form a Lua identifier after replacing spaces: "+alias);
+        for(const auto& old:parameters)require(parameterAlias(old.name)!=alias,"Parameter access name collision: "+alias);
         parameters<<p; return 0;
     }
     if(operation==1) { require(registering && outputs.size()<64,"Output registration only in init"); auto name=stringAt(L,2); require(!outputs.contains(name),"Duplicate output"); outputs<<name; return 0; }
@@ -104,7 +108,7 @@ int LuaEffect::api(lua_State* L,int operation) {
     require(mode=="constant" || mode=="pwm","Unknown output mode"); r.mode=mode=="constant"?Mode::Constant:Mode::Pwm;
     auto strength=numberField(L,3,"strength"); require(strength>=0 && strength<=255 && floor(strength)==strength,"Strength must be integer 0..255"); r.strength=static_cast<int>(strength);
     auto duration=numberAt(L,4); require(duration>0 && duration<=60000,"Duration must be 0..60000 ms"); r.deadline=current+static_cast<qint64>(duration); r.phase=current;
-    if(r.mode==Mode::Pwm) { auto on=numberField(L,3,"on_ms"), period=numberField(L,3,"period_ms"); require(period>=20 && period<=60000 && on>=0 && on<=period,"Invalid PWM timing"); r.on=static_cast<int>(floor(on/20+0.5))*20; r.period=static_cast<int>(floor(period/20+0.5))*20; }
+    if(r.mode==Mode::Pwm) { auto on=numberField(L,3,"on_ms"), period=numberField(L,3,"period_ms"); require(period>=20 && period<=60000 && on>=0 && on<=period,"Invalid PWM timing"); r.on=static_cast<int>(on); r.period=static_cast<int>(period); }
     for(auto v:settings["outputs"].toObject()[name].toArray()) r.destinations<<v.toString();
     pending<<r; return 0;
 }
@@ -134,15 +138,13 @@ QList<Request> LuaEffect::update(const Telemetry& t,bool fresh,qint64 now) {
     protectedCall(0,0); previous=now; return pending;
 }
 void LuaEffect::performUpdate() {
-    const auto& t=updateTelemetry; const bool fresh=updateFresh; const auto now=current;
+    const auto& t=updateTelemetry; const bool fresh=updateFresh;
     lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"update"); lua_pushvalue(state,-2); pushApi();
-    QJsonObject context{{"now_ms",double(now)},{"elapsed_ms",double(previous?now-previous:0)},{"is_new_sample",fresh},{"telemetry_age_ms",t.sequence?QJsonValue(double(now-t.received)):QJsonValue()},{"telemetry_valid",t.valid(now)},{"parameters",settings["parameters"]}};
-    QJsonObject telemetry;
-    if(t.sequence) { QJsonArray gears; for(int i=0;i<3;++i) gears.append(QJsonObject{{"contact",t.contact[i]},{"animation_percent",t.animation[i]}});
-        telemetry={{"sample_id",double(t.sequence)},{"received_ms",double(t.received)},{"sim_time_s",t.simTime},{"sim_time_advanced",fresh && t.advanced},{"aircraft_key",t.aircraft},{"ground_speed_knots",t.speed},{"on_ground",t.ground},{"gears",gears},{"msfs",QJsonObject{{"paused",t.paused}}}};
-    }
-    context["telemetry"]=telemetry; for(auto it=context.begin();it!=context.end();++it) { pushJson(it.value()); lua_setfield(state,-2,it.key().toUtf8().constData()); }
-    lua_call(state,2,0);
+    auto telemetry=telemetryObject(t);telemetry["sim_time_advanced"]=fresh && t.advanced;
+    QJsonObject values;const auto stored=settings["parameters"].toObject();
+    for(const auto& p:parameters)values[parameterAlias(p.name)]=stored[p.name];
+    pushJson(telemetry);pushJson(values);
+    lua_call(state,4,0);
 }
 QStringList LuaEffect::takeLogs() { auto result=logs; logs.clear(); return result; }
 }

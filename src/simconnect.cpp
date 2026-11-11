@@ -1,4 +1,5 @@
 #include "simconnect.h"
+#include "telemetry.h"
 #include <cmath>
 #include <cstring>
 #ifdef STELLA_CHECK_SIMCONNECT_SDK
@@ -27,8 +28,7 @@ void SimConnect::connect() {
         require(open && closeFunction && add && request && nextFunction && subscribe && systemStateFunction,"Missing SimConnect exports");
         require(SUCCEEDED(open(&handle,"Stella Vibra",nullptr,0,nullptr,0)),"MSFS 2024 connection unavailable");
         // Official SIMCONNECT_DATATYPE: FLOAT64=4, STRING256=9.
-        const std::pair<const char*,const char*> variables[]={ {"ABSOLUTE TIME","Seconds"},{"GROUND VELOCITY","Knots"},{"SIM ON GROUND","Bool"},{"GEAR IS ON GROUND:0","Bool"},{"GEAR IS ON GROUND:1","Bool"},{"GEAR IS ON GROUND:2","Bool"},{"GEAR ANIMATION POSITION:0","Percent"},{"GEAR ANIMATION POSITION:1","Percent"},{"GEAR ANIMATION POSITION:2","Percent"} };
-        for(const auto& [name,unit]:variables) require(SUCCEEDED(add(handle,1,name,unit,4,0,0xffffffff)),QString("SimConnect definition failed: ")+name);
+        for(const auto& field:simVariables()) require(SUCCEEDED(add(handle,1,field.name.toUtf8().constData(),field.unit.toUtf8().constData(),4,0,0xffffffff)),"SimConnect definition failed: "+field.name);
         require(SUCCEEDED(add(handle,1,"TITLE",nullptr,9,0,0xffffffff)),"TITLE definition failed");
         require(SUCCEEDED(subscribe(handle,10,"Pause_EX1")),"Pause_EX1 subscription failed");
         require(SUCCEEDED(request(handle,1,1,0,3,0,0,0,0)),"Telemetry request failed");nextCheck=checkDeadline=0; status="Connected / waiting for telemetry";
@@ -47,11 +47,14 @@ QList<Telemetry> SimConnect::poll() {
         if(kind==15 && length>=20 && u32(12)==20) { checkDeadline=0;nextCheck=nowMs()+2000;continue; }
         if(kind==4 && length>=24 && u32(16)==10) { paused=u32(20)!=0; if(paused) { auto t=previous; t.paused=true; result<<t; } }
         if(kind!=8) continue;
-        require(length>=40+9*8+256 && u32(12)==1 && u32(20)==1 && u32(24)==0,"Unexpected telemetry packet layout");
-        QByteArray payload(bytes+40,9*8+256); if(payload==lastPacket) continue; lastPacket=payload;
-        double values[9]; memcpy(values,bytes+40,sizeof values); for(double v:values) require(std::isfinite(v),"Invalid telemetry number");
+        const int count=static_cast<int>(simVariables().size());
+        require(length>=DWORD(40+count*8+256) && u32(12)==1 && u32(20)==1 && u32(24)==0,"Unexpected telemetry packet layout");
+        QByteArray payload(bytes+40,count*8+256); if(payload==lastPacket) continue; lastPacket=payload;
+        QList<double> values(count); memcpy(values.data(),bytes+40,count*8);
         Telemetry t; t.sequence=previous.sequence+1; t.received=nowMs(); t.simTime=values[0]; t.speed=values[1]; t.ground=values[2]!=0; t.paused=paused;
-        auto title=QByteArray(bytes+40+9*8,256); int end=title.indexOf('\0'); require(end>0,"Missing aircraft TITLE"); t.aircraft=QString::fromUtf8(title.constData(),end);
+        for(int i=0;i<count;++i){const auto& field=simVariables()[i];t.values[field.key]=!std::isfinite(values[i])?QJsonValue():field.boolean?QJsonValue(values[i]!=0):QJsonValue(values[i]);}
+        for(int i=0;i<9;++i)require(std::isfinite(values[i]),"Invalid required telemetry number");
+        auto title=QByteArray(bytes+40+count*8,256); int end=title.indexOf('\0'); require(end>0,"Missing aircraft TITLE"); t.aircraft=QString::fromUtf8(title.constData(),end);
         t.advanced=t.simTime>previous.simTime; t.advancedAt=t.advanced?t.received:previous.advancedAt;
         for(int i=0;i<3;++i) { t.contact[i]=values[3+i]!=0; t.animation[i]=values[6+i]; }
         previous=t; result<<t; status=t.paused?"Connected / paused":"Connected";
