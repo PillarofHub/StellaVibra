@@ -20,6 +20,18 @@ void Window::loadProject(const QString& path) {
     local["last_project"]=project.path;QJsonArray recent{project.path};
     for(auto v:local["recent_projects"].toArray())if(v.toString()!=project.path && recent.size()<10)recent<<v;
     local["recent_projects"]=recent;updateRecent();saveLocal();syncFiles();refreshExplorer();apply();rebuildParameters();
+    effectDirectoriesToExpand.clear();const auto effects=QFileInfo(path).absolutePath()+"/effects";
+    if(QFileInfo(effects).isDir())effectDirectoriesToExpand.insert(effects);
+    QDirIterator folders(effects,QDir::Dirs|QDir::NoDotAndDotDot|QDir::NoSymLinks,QDirIterator::Subdirectories);
+    while(folders.hasNext())effectDirectoriesToExpand.insert(folders.next());
+    expandEffectFolders();
+}
+void Window::expandEffectFolders() {
+    auto paths=effectDirectoriesToExpand.values();paths.sort();
+    for(const auto& path:paths){auto index=files->index(path);if(!index.isValid())continue;
+        if(files->canFetchMore(index))files->fetchMore(index);tree->expand(index);
+        if(tree->isExpanded(index) || !files->hasChildren(index))effectDirectoriesToExpand.remove(path);
+    }
 }
 void Window::save() {
     require(!project.path.isEmpty() && !selectedScript.isEmpty(),"Select a file to save");if(selectedScript.endsWith(".sv",Qt::CaseInsensitive)){if(drafts.contains(selectedScript))saveRaw({selectedScript});return;}
@@ -135,6 +147,7 @@ void Window::closeFile() {
     dirty=!drafts.isEmpty()||!dirtyEffects.isEmpty();setWindowModified(dirty);activateTab();updateTabs();
 }
 void Window::closeProject() {
+    effectDirectoriesToExpand.clear();
     engine.clearProject();project={};savedProject={};drafts.clear();dirtyEffects.clear();diskHashes.clear();effectDefaults.clear();selectedId.clear();selectedScript.clear();dirty=false;
     refreshing=true;clearTabs();files->checks.clear();files->errors.clear();profile->clear();profile->addItem("Global",QString());
     tree->setRootIndex(QModelIndex());tree->setEnabled(false);refreshing=false;local.remove("last_project");saveLocal();setWindowTitle("Stella Vibra");setWindowModified(false);updateTabs();rebuildParameters();

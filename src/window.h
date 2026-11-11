@@ -25,6 +25,14 @@ private:
     QWidget* paramPane;
     QLabel* rawNotice;
     QPushButton* pauseButton;
+    QPushButton* enabledButton;
+    QTreeWidget* telemetryView;
+    QLabel* telemetryStatus;
+    qint64 nextTelemetryRefresh=0;
+    QByteArray defaultLayout;
+    QSet<QString> effectDirectoriesToExpand;
+    void expandEffectFolders();
+    void setTickDialog(); void aboutDialog();
     bool paused=false;
     qint64 nextFileScan=0;
     QString selectedId,selectedScript,currentAircraft;
