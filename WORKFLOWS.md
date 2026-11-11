@@ -28,3 +28,11 @@ Effect Control 배치 후속: 파일 탭을 최상단, 그 아래 Parameters/Scr
 파라미터 후속: Power 한 줄/Outputs 가로 표, Default→Global→Specific 최소 저장 및 값 복귀 시 수정 표시 해제. 일반 저장 전 Lua 기본값 갱신·중복값 제거, 알 수 없는 키 보존. 검증은 기존대로 컴파일·diff에 한정한다.
 
 편집 보조 후속: 모드별 Reset All, haptic_power의 vibrate 직접 전달과 예제 단순화, Edit Undo/Redo, 알려진 Lua API/텔레메트리 멤버 자동완성. 기존대로 컴파일·링크·diff만 검증하고 Release/dist를 갱신한다.
+
+## 2026-11-11 범위
+
+선행 누적 변경을 사용자 요청대로 af17f76/c5d1328/4d9e669/42f7995 네 기능 커밋으로 기록했다. 이번 신규 구현: 호환 분기 없는 Lua 세 인수/API context와 파라미터 alias 완성, 폴더 오른쪽 체크/Enabled 상태, 새 프로젝트 옵션, 세 카테고리 11개 효과, 공식 표준 SimVar 확장/Telemetry 창, View 복원, Settings Tick, About 고지. C++ 컴파일·링크와 luac -p 문법 컴파일만 수행하며 Lua 콜백/앱/게임/HID 테스트는 실행하지 않는다. 이번 신규 변경은 선행 작업 커밋 요청에 자동 포함하지 않고 작업 트리에 둔다.
+
+레이아웃 후속: 1:4:1 좌우, 4:1 본문/Output, 1:1 Parameters/Script, 이름 뒤 체크박스, open 시 effects 전체 펼침. 공식 SimConnect 문서/헤더 검토 결과 구독 목록 기반 자동완성 유지. 하드웨어 없는 --ui-check로 시작·배치 복원을 점검하고 실제 트리 조작은 사용자 확인으로 남긴다.
+
+체크박스 후속: Qt 기본 아이콘 앞 배치로 단순화하고 최상위 effects 체크를 제외한다. 텔레메트리는 기존11개 효과의 입력 충족 여부 및 추가 후보만 검토하며 구독 확대는 하지 않는다.

@@ -18,6 +18,11 @@ if ($Deploy) { $destinations += "$root\dist\StellaVibra" }
 foreach ($destination in $destinations) {
     & $cmake --install "$root\build" --config Release --prefix $destination
     if ($LASTEXITCODE) { throw 'Install failed' }
+    # These two templates moved into ground/. Remove only their obsolete shipped copies.
+    foreach ($oldTemplate in @('ground_roll.lua','touchdown.lua')) {
+        $oldPath = Join-Path $destination "effects/$oldTemplate"
+        if (Test-Path -LiteralPath $oldPath) { Remove-Item -LiteralPath $oldPath }
+    }
     $qtDeployTool = "$root\.deps\bin\windeployqt.exe"
     & $qtDeployTool --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime "$destination\StellaVibra.exe"
     if ($LASTEXITCODE) { throw 'Qt deployment failed' }

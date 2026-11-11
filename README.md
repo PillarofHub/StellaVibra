@@ -9,7 +9,7 @@ Windows용 Lua 기반 햅틱 효과 편집·실행 도구. 제품 UI는 영어, 
 - C++20, Qt Widgets, CMake, MSVC, Windows 10/11 x64, 임베디드 Lua.
 - Win32로 Windows/HID를 연동한다. DirectX는 필요할 때 사용하며 MVP UI에 별도 렌더러를 만들지 않는다.
 - EXE와 필요한 DLL·플러그인을 동봉하는 포터블 폴더 배포. .NET 설치를 요구하지 않는다. Qt 6.8.3, Lua 5.4.8. 라이선스·배포 조건은 THIRD-PARTY-NOTICES.md를 따른다.
-- MSFS 어댑터 하나, 확인된 하드웨어, Ground Roll과 Touchdown 두 Lua 효과부터 구현한다.
+- MSFS 어댑터 하나, 확인된 하드웨어, ground/aerodynamics/engines의 11개 Lua 효과를 제공한다.
 - 프로젝트·기체 프로필, Lua 편집과 자동 파라미터 UI, 논리 출력 매핑, 출력 모니터, 모터 테스트 UI, 로그를 포함한다.
 - 완전한 IDE/LSP/스텝 디버거, 다중 게임 동시 연결, 범용 플러그인 시스템, 스크립트 패키지 관리자, 녹화·리플레이, 장치별 출력 보정은 제외한다.
 - Aurora Vibra는 읽기 전용 참고 구현이다. GUI·게임·하드웨어 검증과 모터 구동은 사용자가 수행한다.
@@ -18,15 +18,16 @@ Windows용 Lua 기반 햅틱 효과 편집·실행 도구. 제품 UI는 영어, 
 
 | 위치 | 화면 | 기능 |
 | --- | --- | --- |
-| 상단 | File / Edit / View 메뉴 | 프로젝트·저장 / Undo·Redo / 네 도킹 창 표시·숨기기 |
-| 좌측 | Project Explorer | 단일 폴더 트리, Lua 파일 옆 활성화 체크박스, 접기·펼치기, 오류 표시 |
+| 상단 | File / Edit / View / Settings / Help 메뉴 | 프로젝트·저장 / Undo·Redo / 다섯 도킹 창 표시·숨기기 |
+| 좌측 | Project Explorer | 단일 폴더 트리, Lua/하위 효과 폴더 아이콘 앞 활성화 체크박스, 접기·펼치기, 오류 표시 |
 | 중앙 위 | Parameters | Global/Specific Aircraft 선택, 슬라이더·수치 입력, 출력 목적지, 모드별 개별/전체 Reset |
 | 중앙 아래 | Script Editor | 파일별 탭, Lua/JSON 편집, 행 번호, 문법 강조, 검색, 저장 시 적용 |
 | 우측 | Motor Monitor | 슬롯순 모터 목록, Slots 셀 매핑, HID 셀 테스트, Stop All/Resume All |
+| 우측 아래 | Telemetry | 지원 SimVar 값·단위·Live/Paused/Stale 상태 |
 | 하단 | Debug Output | 효과별 로그·오류, 필터, Clear, 오류 위치 이동 |
 | 최하단 | Status Bar | 게임·장치 연결과 실행 상태 |
 
-Project Explorer, Effect Control, Motor Monitor, Debug Output은 도킹 창이며 View 메뉴에서 각각 표시·숨기기를 바꾼다. Effect Control 최상단 파일 탭 아래에 Parameters/Script Editor를 위아래로 묶는다. 두 영역 모두 선택한 파일에 속하며 분할선을 끌어 높이를 조절한다. 창의 X로 닫아도 View에서 다시 열 수 있고, 창을 숨겨도 실행은 중지되지 않는다. 창 배치는 로컬에 저장한다. 현재 출력에 적용되는 기체와 편집 중인 프로필을 분리한다. MSFS·지원 HID를 자동 연결하고 유효한 텔레메트리와 활성 효과가 있으면 자동 실행한다. Motor Monitor의 Stop All/Resume All이 전체 출력을 제어한다. 연결 자체나 테스트 창 열기는 진동 명령을 생성하지 않는다. 이전의 시작 시 Stopped 규칙은 이번 자동 실행 요청으로 변경되었다.
+Project Explorer, Effect Control, Motor Monitor, Telemetry, Debug Output은 도킹 창이며 View 메뉴에서 각각 표시·숨기기를 바꾼다. Effect Control 최상단 파일 탭 아래에 Parameters/Script Editor를 위아래로 묶는다. 두 영역 모두 선택한 파일에 속하며 분할선을 끌어 높이를 조절한다. 창의 X로 닫아도 View에서 다시 열 수 있고, 창을 숨겨도 실행은 중지되지 않는다. 창 배치는 로컬에 저장한다. 현재 출력에 적용되는 기체와 편집 중인 프로필을 분리한다. MSFS·지원 HID를 자동 연결하고 유효한 텔레메트리와 활성 효과가 있으면 자동 실행한다. Motor Monitor의 Stop All/Resume All이 전체 출력을 제어한다. 연결 자체나 테스트 창 열기는 진동 명령을 생성하지 않는다. 이전의 시작 시 Stopped 규칙은 이번 자동 실행 요청으로 변경되었다.
 
 ## 프로젝트와 설정
 
@@ -34,7 +35,7 @@ Project Explorer, Effect Control, Motor Monitor, Debug Output은 도킹 창이�
 My Flight Project/
   My Flight Project.sv
   effects/
-    Landing/
+    ground/
       ground_roll.lua
       touchdown.lua
   aircrafts/
@@ -73,15 +74,15 @@ My Flight Project/
 
 ## Lua 실행과 API
 
-스크립트 하나는 상태를 가진 효과 하나다. 호스트가 인스턴스의 init(api), update(context)를 호출한다. 상태는 self에 보관하며 destroy/exit 콜백 없이 호스트가 자원을 회수한다. 효과별 호출은 직렬화한다.
+스크립트 하나는 상태를 가진 효과 하나다. 호스트가 인스턴스의 init(context), update(context, telemetry, parameters)를 호출한다. 상태는 self에 보관하며 destroy/exit 콜백 없이 호스트가 자원을 회수한다. 효과별 호출은 직렬화한다.
 
 ### 초기화
 
 init은 파라미터·출력 목록을 등록하고 상태를 초기화한다. 비활성 효과도 UI 구성을 위해 초기화하되 출력은 허용하지 않는다. 등록 정의는 텔레메트리나 저장값에 따라 변하지 않는다. 등록이 끝나면 호스트가 글로벌·기체 값을 합성한다.
 
 ```lua
-function effect:init(api)
-    api:parameter {
+function effect:init(context)
+    context:parameter {
         name = "Strength",
         type = "int",
         default = 20,
@@ -89,8 +90,8 @@ function effect:init(api)
         max = 255,
         step = 1
     }
-    api:output("Left Gear")
-    api:output("Right Gear")
+    context:output("Left Gear")
+    context:output("Right Gear")
 end
 ```
 
@@ -100,17 +101,7 @@ parameter는 type="boolean"/"int"/"float"/"haptic_power"와 default를 등록한
 
 새 텔레메트리가 들어오면 update를 호출한다. 마지막 호출 후 일정 시간(초기 기준 100 ms) 동안 새 데이터가 없으면 최신 스냅샷으로 다시 호출한다. 이는 목표 호출 간격이며 하드 실시간 보장이 아니다.
 
-context는 호출 정보와 호스트 API를 묶는다. 공식 예제는 context, telemetry, parameters 같은 풀네임을 사용한다.
-
-| 필드 | 의미 |
-| --- | --- |
-| now_ms | 이번 호출의 호스트 단조 시각 |
-| elapsed_ms | 이전 호출 이후 경과 시간 |
-| telemetry | 최신 입력 스냅샷, 원래 샘플 식별자·시각 포함 |
-| is_new_sample | 실제 새 입력인지 재전달인지 |
-| telemetry_age_ms / telemetry_valid | 마지막 실제 수신 이후 경과 시간 / 입력 유효성 |
-| parameters | 상속을 합성한 최종 파라미터 |
-
+context는 API 메서드만 제공한다. init에서는 parameter/output/log, update에서는 log/vibrate/now/elapsed/sample_is_new/input_valid를 제공한다. now()/elapsed()의 단위는 ms다. telemetry는 수신 데이터와 샘플 메타데이터, parameters는 기본값→Global→기체 합성값을 담는 별도 인수다. context.telemetry/context.parameters 및 이전 필드 방식은 제공하지 않는다. 상태는 self에 유지한다.
 재전달은 원래 샘플 시각이나 입력 만료를 갱신하지 않는다. 첫 입력 전·누락값은 무효로 표현하며 0으로 위장하지 않는다. 게임 자체의 중복 패킷·시뮬레이션 시각 정체도 구분한다. 공통 텔레메트리는 단위와 의미를 고정하고 게임 전용 값은 별도 영역에 둔다. 필수 입력 미지원은 출력하지 않고 이유를 표시한다.
 
 ### 출력과 로그
@@ -146,7 +137,7 @@ context:vibrate("Left Gear", off())
 - PWM→PWM은 기준 시각을 유지하고 새 사양으로 즉시 계산한다. 갱신마다 처음부터 시작하지 않는다.
 - PWM→Constant는 내부 OFF 구간을 기다리지 않고 전환한다. Constant/Off→PWM은 ON 구간부터 시작한다.
 - 위상은 효과·포트별로 호스트가 관리한다. Lua에 restart 옵션을 제공하지 않는다.
-- 초기 HID 틱은 20 ms다. PWM 시간은 가까운 틱으로 반올림하고 중간값은 올림한다. 유효 시간은 UI에 표시한다. ON=0은 무출력, ON=주기는 연속 출력이다. 반올림으로 0이 된 ON을 몰래 늘리지 않는다.
+- HID 틱 기본값은 20 ms이며 Settings → Set Tick에서 5–100 ms로 설정한다. PWM 시간은 가까운 틱으로 반올림하고 중간값은 올림한다. 유효 시간은 UI에 표시한다. ON=0은 무출력, ON=주기는 연속 출력이다. 반올림으로 0이 된 ON을 몰래 늘리지 않는다.
 
 ### 여러 요청의 우선순위
 
@@ -190,7 +181,7 @@ Ground Roll은 이동·접촉 조건을 만족하면 지정 세기를 요청한�
 - 마지막 프로젝트를 시작 시 복원한다. 해당 파일을 못 찾으면 빈 화면이며 다른 최근 프로젝트를 대신 열지 않는다. File → Open Recent에서 최근 10개를 열 수 있다.
 - Explorer는 파일 트리 하나다. 등록된 Lua 옆 체크박스는 Parameters에서 선택한 프로필의 enabled를 제어한다. 폴더를 접고 펼칠 수 있고, 파일 더블클릭으로 탭을 연다. 탭은 이동·닫기가 가능하며 미저장 파일/설정은 *로 표시한다.
 - Parameters 상단에서 Global 또는 Specific Aircraft: TITLE을 선택한다. 실제 실행 기체는 수신된 TITLE로 결정된다. Global의 Reset All to Default는 선택 효과의 글로벌 활성화/파라미터/출력 설정을 지워 기본값(true/등록 기본값/빈 출력)으로 되돌린다. Specific의 Reset All to Global은 선택 효과의 해당 기체 Override 전체를 제거한다. 스크립트는 기체와 무관한 공통 파일이다.
-- New Project는 빈 폴더에 Ground Roll, Touchdown을 만든다. 두 예제는 haptic_power를 사용한다. Left Gear→Throttle:1, Right Gear→Throttle:2, Center Gear는 기본 미배정이다.
+- New Project는 Project Directory, Target Game(MSFS 2024), Generate default Lua scripts를 받는다. 체크 시 세 카테고리 11개 예제를 복사하며, 해제 시 빈 프로젝트를 만든다. Left Gear→Throttle:1, Right Gear→Throttle:2, Center Gear는 기본 미배정이다.
 
 ### 빌드와 배포
 
@@ -253,8 +244,51 @@ Outputs는 출력 이름을 가로 제목으로 하는 표다. 아래 선택 셀
 
 ## Lua 파워 직접 전달과 편집 보조
 
-`context:vibrate(name, parameters.Power, duration_ms)`로 상속이 합성된 haptic_power 객체를 직접 전달한다. mode가 없으면 pwm boolean으로 Constant/PWM을 선택하며 기존 강도·시간 검증, 위상·기한 규칙을 그대로 적용한다. 객체를 변경하지 않는다. 명시적인 mode가 있으면 우선하고 기존 constant/pwm/off 헬퍼도 유지하므로 시간에 따른 강도 계산도 가능하다. 신규 프로젝트용 두 예제는 직접 전달을 사용한다. 기존 프로젝트의 Lua 파일은 자동으로 덮어쓰지 않는다.
+`context:vibrate(name, parameters.Power, duration_ms)`로 상속이 합성된 haptic_power 객체를 직접 전달한다. mode가 없으면 pwm boolean으로 Constant/PWM을 선택하며 기존 강도·시간 검증, 위상·기한 규칙을 그대로 적용한다. 객체를 변경하지 않는다. 명시적인 mode가 있으면 우선하고 기존 constant/pwm/off 헬퍼도 유지하므로 시간에 따른 강도 계산도 가능하다. 신규 프로젝트용 예제는 직접 전달을 사용한다. 기존 프로젝트의 Lua 파일은 자동으로 덮어쓰지 않는다.
 
 File과 View 사이 Edit 메뉴는 활성 Lua/JSON 문서의 Undo(Ctrl+Z), Redo(Ctrl+Y 또는 Ctrl+Shift+Z)를 제공한다. 파라미터 변경 이력을 위한 Undo 스택은 추가하지 않는다.
 
-Lua 편집기는 context: / api: 메서드와 context. / telemetry. / context.telemetry. 필드, telemetry.msfs. 및 gear. / telemetry.gears[index]. 필드를 자동 제안한다. 입력한 접두사로 필터하며 방향키·Enter/Tab으로 선택, Escape로 닫고 Ctrl+Space로 다시 요청한다. 문자열/주석과 JSON에서는 제안하지 않는다. 알려진 이름 기반의 가벼운 보조이며 임의 별칭·사용자 테이블·동적 파라미터명 추론이나 LSP는 제공하지 않는다.
+Lua 편집기는 init/update의 context: 메서드, telemetry.의 지원 필드, parameters.의 init 등록 이름을 제안한다. 파라미터 공백은 _로 바꾸고 Lua 식별자/예약어/충돌을 검증한다. 표시명과 .sv 저장 키는 원래 이름이다. parameters.Power.에서는 haptic_power 필드를 제안한다. 자동완성은 초안의 문자 그대로 쓴 name/type 등록을 읽으며 코드를 실행하지 않는다. 임의 별칭/계산된 이름/LSP 추론은 제공하지 않는다. Enter/Tab 선택, Escape 취소, Ctrl+Space 재요청을 지원한다.
+
+## 2026-11-11 편집·진단 확장
+
+이 버전은 개발 중 API 변경으로 이전 Lua 호출 방식과 호환하지 않는다. 기존 프로젝트 파일은 덮어쓰지 않는다. 새 프로젝트를 생성하거나 기존 Lua를 init(context), update(context, telemetry, parameters)로 수정한다. parameters["Minimum speed knots"]는 parameters.Minimum_speed_knots로, context.now_ms는 context:now()로 변경한다.
+
+Explorer는 아이콘 앞의 체크박스로 effects 하위 폴더와 개별 Lua를 제어한다. 최상위 effects 폴더에는 체크박스가 없다. 별도 On 열은 사용하지 않는다. 일부만 켜진 폴더는 부분 체크다. 현재 편집 중인 Global/Specific 프로필에 적용하며 기체/.sv 파일은 체크박스가 없다. Enabled/Disabled는 Parameters 상단의 별도 버튼이며 Lua 파라미터가 아닌 프로젝트 활성화 상태다. 파라미터 앞의 설명문과 enabled 행을 제거했고 Power 전용 최대 너비 제한도 제거했다.
+
+Telemetry 도킹 창은 Motor Monitor 아래에 있다. 실제 수신한 지원 필드의 값·단위·원 SimVar 이름(툴팁)을 표시하며 미수신은 Unavailable, 연결 종료/일시정지/만료는 Disconnected/Paused/Stale로 구분한다. 100ms마다 화면만 갱신하며 수신 시각과 유효기간은 연장하지 않는다. MSFS 전체 SimVar 사전이나 기체 전용 L-var 탐색기는 아니다. View 마지막 Reset Default Layout은 숨긴 창까지 기본 배치로 복원한다.
+
+Settings → Set Tick의 5–100ms 설정은 HID 스케줄과 PWM 반올림에 함께 적용한다. 20ms 초기화 버튼과 OK/Cancel을 제공하고 PC 로컬에 저장한다. 변경 시 테스트/활성 요청을 제거하고 Lua 상태를 재초기화한다. SimConnect 샘플 주기는 변경하지 않는다. OS/USB의 실제 타이밍 정밀도를 보장하지 않는다. Help → About은 MIT/Qt LGPL/Aurora 고지와 타사 라이선스 안내를 표시한다.
+
+기본 효과는 ground(Ground Roll, Touchdown, Ground Thumps), aerodynamics(Stall, Overspeed, Spoilers, Flaps, Bank), engines(Startup, Shutdown, Thrust) 11개다. Aurora의 표준 입력 조건을 참조하되 게임 판단은 모두 Lua에 있다. Ground Thumps는 슬랩 간격/속도 기반 모델이며 실제 노면 충격 센서가 아니다. Flaps는 실제 플랩/슬랫 값 변화+짧은 유지 시간, Spoilers는 좌우 전개/대칭, Bank는 비행 중 뱅크각을 사용한다. 기체 전용 L-var 보정과 Aurora의 파형 혼합/레거시 강도 곡선은 가져오지 않는다. 엔진 Startup은 starter/combustion 상승, Shutdown은 combustion 하강 후 감쇠, Thrust는 제트/프로펠러 추력을 사용한다. 최초 샘플은 엔진 edge를 만들지 않는다. Full scale pounds와 Propeller thrust는 기체에 맞춰 조정한다. 표준 SimVar를 갱신하지 않는 애드온은 별도 지원되지 않는다.
+
+새 프로젝트의 Airframe 출력은 Stick:1, Engine 1–4는 Throttle:1–4, Left/Right Gear는 Throttle:1/2에 연결하며 Center Gear는 미배정이다. 원하는 장치/슬롯으로 변경해야 한다. 여러 효과의 요청은 기존 우선순위로 하나만 선택한다.
+
+공식 입력 근거: [MSFS 2024 SimVars](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/simulation-variables/), [Engine variables](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/aircraft-simvars/aircraft-engine-variables/). 실제 구독명/단위는 src/telemetry.h의 공통 목록이며 SimConnect 등록·디코딩·자동완성·Telemetry 뷰가 공유한다.
+
+시작 배치 복원은 현재 layout_version=4일 때만 한 번 수행한다. 이전 버전은 새 기본 배치를 사용하므로 설정 파일을 삭제할 필요가 없다. `StellaVibra.exe --ui-check`는 하드웨어/게임 스레드·프로젝트 자동 복원·설정 저장 없이 창 표시와 기본 배치 복원을 확인하고 2초 후 종료하는 진단 모드다.
+
+## 기본 배치 및 효과 트리
+
+기본 좌우 폭은 Project Explorer : Effect Control : Motor Monitor/Telemetry = 1:4:1, 본문 : Debug Output 높이는 4:1, Parameters : Script Editor는 1:1을 목표로 한다. Monitor의 380px 최소 폭과 Output 목록의 큰 최소 높이 제약을 완화했다. 작은 화면에서는 Qt 최소 크기/제목줄/분할선 때문에 비율이 근사값이다. View → Reset Default Layout에서도 같은 비율을 적용한다. 배치 버전4 이전의 저장 배치는 새 기본 배치로 교체하며 이후 사용자 조정은 저장한다.
+
+체크박스는 각 파일/하위 폴더 아이콘 앞에 배치해 같은 깊이에서 정렬한다. 최상위 effects 폴더의 체크박스는 생략한다. 폴더 부분 체크/일괄 토글과 Space 조작을 유지하고 .sv/aircraft에는 표시하지 않는다. 프로젝트를 열면 effects의 모든 하위 폴더를 펼치며, 비동기 디렉토리 로딩도 처리한다. 열린 뒤 사용자가 접은 폴더를 주기적으로 다시 펼치지는 않는다.
+
+현재 Telemetry/자동완성 목록은 공식 SimVar 전체가 아닌 앱의 구독 목록(숫자/boolean48개 + TITLE 및 호스트 메타데이터)이다. SimConnect는 AddToDataDefinition으로 지정한 이름·단위를 RequestDataOnSimObject로 요청하는 방식이므로 게임 연결만으로 목록이 늘어나지 않는다. 추가 항목은 공식 정의에 따라 구독 목록과 Lua 계약에 등록해야 한다. 기체별 값의 의미/갱신 여부가 다르며 0이나 정체를 미지원 증거로 사용하지 않는다. 따라서 연결 시 자동완성 키를 임의로 추가/삭제하지 않는다. EnumerateInputEvents는 현재 기체의 InputEvent 목록으로, 전체 SimVar의 지원 여부 목록이 아니다.
+
+근거: [AddToDataDefinition](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simconnect/api-reference/events-and-data/simconnect_addtodatadefinition/), [RequestDataOnSimObject](https://docs.flightsimulator.com/msfs2024/flighting/programming-apis/simconnect/api-reference/events-and-data/simconnect_requestdataonsimobject/), [EnumerateInputEvents](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simconnect/api-reference/inputevents/simconnect_enumerateinputevents/). SDK Core1.7.3 헤더의 열거 함수도 대조했으며, 전체 표준 SimVar 지원 목록을 현재 기체에서 반환하는 API는 확인되지 않았다. 실제 게임 연결/변수 탐색은 수행하지 않았다.
+
+## 텔레메트리 확장 검토
+
+현재 11개 예제의 코드가 사용하는 입력은 기존48개+TITLE로 충족한다. 이것은 각 애드온이 표준 SimVar를 정확히 제공한다는 보장이 아니다. 당장 모든 공식 변수를 구독할 필요는 없고 새 효과와 함께 다음 순서로 확장하는 것을 권한다. 아래 용도는 문서상 변수 의미를 바탕으로 한 설계 제안이며 이번 변경에 구독 추가는 없다.
+
+| 우선순위 | 후보 | 활용 및 한계 |
+| --- | --- | --- |
+| 1 | SURFACE TYPE | Ground Roll/Thumps를 잔디·포장·물 등으로 구분. 실제 요철 크기나 슬랩 위치를 측정하는 값은 아니다. |
+| 2 | G FORCE, ACCELERATION BODY X/Y/Z | 하중과 기체 흔들림을 이용한 반응형 효과. 축/단위·중력/정상기동 성분·노이즈를 고려해 Lua에서 필터링한다. 난기류만을 분리하는 센서는 아니다. |
+| 3 | INCIDENCE ALPHA, STALL ALPHA | 현재 stall_warning ON/OFF 대신 실속 임박 정도에 따른 점진적 버핏을 설계. 기체별 검증과 각도 단위 일치가 필요하다. |
+| 4 | GEAR TOTAL PCT EXTENDED, BRAKE LEFT/RIGHT POSITION | 기어 작동/전개 및 제동 효과. 접지·속도 조건과 함께 사용하며 브레이크 위치를 실제 감속/마찰력으로 취급하지 않는다. |
+
+Ground Thumps는 우선 SURFACE TYPE으로 개선할 가치가 크다. G FORCE/가속도는 새 기체 반응 효과로 분리하고, 기존 Touchdown의 첫 압축 상승 판단을 대체하지 않는다. 이미 구독 중인 엔진 RPM%/N1/N2는 기본 예제에서 직접 사용하지 않으므로 엔진 스풀 효과를 확장할 때 우선 재사용할 수 있다.
+
+근거: [Miscellaneous variables](https://docs.flightsimulator.com/msfs2024/retail/programming-apis/simvars/aircraft-simvars/aircraft-miscellaneous-variables/), [Flight model variables](https://docs.flightsimulator.com/msfs2024/html/6_Programming_APIs/SimVars/Aircraft_SimVars/Aircraft_FlightModel_Variables.htm), [Brake and landing gear variables](https://docs.flightsimulator.com/msfs2024/flighting/programming-apis/simvars/aircraft-simvars/aircraft-brake-and-landing-gear-variables/).

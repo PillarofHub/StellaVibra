@@ -4,7 +4,7 @@
 
 ## 파일
 
-프로젝트 `.sv`: `{"version":1,"id":"UUID","name":"Flight","game":"MSFS2024","effects":[{"id":"UUID","script":"effects/ground_roll.lua","enabled":true,"parameters":{"Strength":20},"outputs":{"Left Gear":["Throttle:1"],"Right Gear":["Throttle:2"]}}]}`.
+프로젝트 `.sv`: `{"version":1,"id":"UUID","name":"Flight","game":"MSFS2024","effects":[{"id":"UUID","script":"effects/ground/ground_roll.lua","enabled":true,"parameters":{"Strength":20},"outputs":{"Left Gear":["Throttle:1"],"Right Gear":["Throttle:2"]}}]}`.
 
 기체 `aircrafts/UUID.sv`: `{"version":1,"aircraft_key":"정확한 TITLE","effects":{"효과 UUID":{"enabled":false,"parameters":{"Strength":10},"outputs":{"Left Gear":[]}}}}`.
 누락은 상속, false와 []는 명시값. 출력은 이름별 전체 교체. Reset to Global은 해당 키 삭제. 일치하는 기체 파일이 두 개면 실행 거부. 기체 키는 같은 샘플의 TITLE 문자열 전체다. TITLE을 정규화·부분 매칭하지 않는다.
@@ -15,27 +15,27 @@ JSON 상위 버전·잘못된 자료형·경로 이탈·중복 ID는 거부한�
 
 ## Lua
 
-파일은 `local effect = {}; function effect:init(api) ... end; function effect:update(context) ... end; return effect` 형식이다. self는 해당 인스턴스의 테이블이다. init에서만 `api:parameter{name=string,type="boolean"|"int"|"float"|"haptic_power",default=...}`를 등록한다. int/float은 min/max/step이 필수이며 값은 유한하고 범위 안이어야 한다. int는 기본값·범위·step·저장값 모두 정수다. 이전 형식의 type 누락은 boolean/float으로 해석해 호환한다. 이름 중복은 오류다. `api:output(name)`은 이름 문자열 포트를 등록한다.
+파일은 `local effect = {}; function effect:init(context) ... end; function effect:update(context, telemetry, parameters) ... end; return effect` 형식이다. self는 해당 인스턴스의 테이블이다. init에서만 `context:parameter{name=string,type="boolean"|"int"|"float"|"haptic_power",default=...}`를 등록한다. int/float은 min/max/step이 필수이며 값은 유한하고 범위 안이어야 한다. int는 기본값·범위·step·저장값 모두 정수다. type은 필수다. 이름 중복은 오류다. `context:output(name)`은 이름 문자열 포트를 등록한다.
 
-update의 `context.parameters`는 default→global→현재 기체 합성값이다. `context:log(text)`, `context:vibrate(name,constant(strength),duration_ms)`, `context:vibrate(name,pwm{strength=...,on_ms=...,period_ms=...},duration_ms)`, `context:vibrate(name,off())`를 제공한다. 세기는 정수 0–255, 기간은 0초과 60000ms 이하, PWM은 0≤ON≤period≤60000, period≥20ms다. OFF에는 기간이 없다. 정상 콜백이 끝난 뒤 명령 전체를 적용하며 오류 시 해당 효과 출력을 해제한다.
+update의 `parameters`는 default→global→현재 기체 합성값이다. `context:log(text)`, `context:vibrate(name,constant(strength),duration_ms)`, `context:vibrate(name,pwm{strength=...,on_ms=...,period_ms=...},duration_ms)`, `context:vibrate(name,off())`를 제공한다. 세기는 정수 0–255, 기간은 0초과 60000ms 이하, PWM은 0≤ON≤period≤60000, period≥20ms다. OFF에는 기간이 없다. 정상 콜백이 끝난 뒤 명령 전체를 적용하며 오류 시 해당 효과 출력을 해제한다.
 
 Lua 라이브러리는 base/math/string/table/utf8만 허용하고 파일·프로세스·네트워크·package/debug/coroutine/load/pcall/xpcall/setmetatable/getmetatable을 제거한다. Lua는 C++로 컴파일해 오류 시 호스트 객체도 예외 해제한다. 인스턴스 Lua 할당 메모리 8MiB, 콜백 200000명령 또는 20ms(1000명령마다 검사하며 네이티브 라이브러리 호출의 하드 실시간 선점은 아님), 소스 256KiB, 등록 각각 64개, 콜백 출력 128개와 로그 8개로 제한한다. top-level과 init도 보호 호출 안에서 실행한다.
 
 ## 입력과 실행
 
-UI, Lua/SimConnect 실행 스레드, HID 스레드를 분리한다. SimConnect 호출은 실행 스레드에 한정한다. 입력 프레임은 최대 64개씩 직렬 처리한다. backlog 초과 시 연결을 끊고 출력을 정리한다. 새 입력은 수신 직후 update한다. 100ms마다 최신 스냅샷을 재전달하되 sample_id와 received_ms를 변경하지 않는다. now_ms/elapsed_ms는 호스트 steady_clock ms다. telemetry_age_ms는 실제 수신 기준, telemetry_valid는 수신 후 500ms 이내이고 sim 시간이 최근 500ms 안에 전진했으며 pause가 아닐 때만 true다. 기체 변경·시간 역행·pause·오류·Stop은 출력과 효과 상태를 초기화한다. 가속 시 파형과 Touchdown 지속 시간은 벽시계 기준이다.
+UI, Lua/SimConnect 실행 스레드, HID 스레드를 분리한다. SimConnect 호출은 실행 스레드에 한정한다. 입력 프레임은 최대 64개씩 직렬 처리한다. backlog 초과 시 연결을 끊고 출력을 정리한다. 새 입력은 수신 직후 update한다. 100ms마다 최신 스냅샷을 재전달하되 sample_id와 received_ms를 변경하지 않는다. context:now()/elapsed()는 호스트 steady_clock ms다. 입력 age는 context:now()-telemetry.received_ms이며 context:input_valid()는 수신 후 500ms 이내이고 sim 시간이 최근 500ms 안에 전진했으며 pause가 아닐 때만 true다. 기체 변경·시간 역행·pause·오류·Stop은 출력과 효과 상태를 초기화한다. 가속 시 파형과 Touchdown 지속 시간은 벽시계 기준이다.
 
-telemetry: `sample_id, received_ms, sim_time_s, aircraft_key, ground_speed_knots, on_ground, gears={ {contact=bool,animation_percent=number}, ... }`, gears 순서는 Center/Left/Right다. MSFS 전용 값은 `msfs={paused=bool}`. 누락값은 nil이며 첫 샘플 전 유효하지 않다. 중복 시각도 실제 패킷이면 is_new_sample=true, `sim_time_advanced=false`; 재전달은 둘 다 false다. 완전 중복 패킷은 폐기해 수신 시각을 연장하지 않는다.
+telemetry: `sample_id, received_ms, sim_time_s, aircraft_key, ground_speed_knots, on_ground, gears={ {contact=bool,animation_percent=number}, ... }`, gears 순서는 Center/Left/Right다. MSFS 전용 값은 `msfs={paused=bool}`. 누락값은 nil이며 첫 샘플 전 유효하지 않다. 중복 시각도 실제 패킷이면 context:sample_is_new()=true, `sim_time_advanced=false`; 재전달은 둘 다 false다. 완전 중복 패킷은 폐기해 수신 시각을 연장하지 않는다.
 
 ## 출력
 
-HID 20ms. 기간은 update now+duration으로 교체한다. PWM 시간은 floor(ms/20+0.5)*20, 유효값으로 순위 비교. PWM→PWM은 만료되지 않은 기존 위상 유지, 다른 모드→PWM은 ON부터 시작. 요청 선택은 Constant 우선, 세기 내림차순, PWM 주기 오름차순·ON 내림차순. 완전 동률은 현재 승자 유지, 최초는 효과 UUID/포트 이름 사전순. 선택 후 파형을 계산하며 OFF 구간을 다른 후보로 채우지 않는다.
+HID 기본 20ms, PC 로컬 tick_ms=5..100ms. 기간은 update now+duration으로 교체한다. PWM 시간은 floor(ms/tick_ms+0.5)*tick_ms, 유효값으로 순위 비교. PWM→PWM은 만료되지 않은 기존 위상 유지, 다른 모드→PWM은 ON부터 시작. 요청 선택은 Constant 우선, 세기 내림차순, PWM 주기 오름차순·ON 내림차순. 완전 동률은 현재 승자 유지, 최초는 효과 UUID/포트 이름 사전순. 선택 후 파형을 계산하며 OFF 구간을 다른 후보로 채우지 않는다.
 
 실행기 heartbeat 250ms 초과, 입력 500ms 만료, Stop 시 HID 스레드가 출력 해제. 정상 heartbeat는 기존 예약을 연장하지 않는다. generation 변경 후 낡은 명령은 버린다. 테스트는 모터 하나, 명시적 Start, 최대 5000ms이며 그 모터 게임 출력을 제외한다. 창을 열기만 하면 출력하지 않는다. 전역 Stop은 테스트도 종료한다.
 
 ## 효과
 
-실제 예제는 `effects/ground_roll.lua`, `effects/touchdown.lua`. Ground Roll은 속도/접촉 게이트와 짧은 재요청을 Lua에서 수행한다. Touchdown은 바퀴마다 첫 airborne 관측 후 재무장한다. 접촉 상승에서 시작하여 첫 평탄/하강한 새로운 sim-time 샘플에서 첫 상승 시간×배수를 min/max로 제한해 최초 접촉 벽시계 기준 기한을 확정한다. 이후 피크는 무시한다. 중복 sim-time 접촉 변화는 수용하지만 상승 종료 근거로 사용하지 않는다. 압축 애니메이션은 힘이 아니며 미지원/정적인 기체는 최소 펄스를 사용한다. 확정 전에는 min과 관측된 상승 시간에 맞춰 스크립트가 재요청하며 호스트는 연장하지 않는다.
+실제 예제는 `effects/ground/ground_roll.lua`, `effects/ground/touchdown.lua`. Ground Roll은 속도/접촉 게이트와 짧은 재요청을 Lua에서 수행한다. Touchdown은 바퀴마다 첫 airborne 관측 후 재무장한다. 접촉 상승에서 시작하여 첫 평탄/하강한 새로운 sim-time 샘플에서 첫 상승 시간×배수를 min/max로 제한해 최초 접촉 벽시계 기준 기한을 확정한다. 이후 피크는 무시한다. 중복 sim-time 접촉 변화는 수용하지만 상승 종료 근거로 사용하지 않는다. 압축 애니메이션은 힘이 아니며 미지원/정적인 기체는 최소 펄스를 사용한다. 확정 전에는 min과 관측된 상승 시간에 맞춰 스크립트가 재요청하며 호스트는 연장하지 않는다.
 
 ## 연동 근거
 
@@ -57,14 +57,14 @@ MSFS는 미연결 시 2초마다 재시도한다. 연결 중에는 [RequestSyste
 ## haptic_power 파라미터
 
 ```lua
-api:parameter {
+context:parameter {
     name="Power", type="haptic_power",
     default={strength=20, pwm=false, on_ms=20, period_ms=80},
     min=0, max=255
 }
 ```
 
-default 테이블은 필수. 테이블 내 생략값은 strength=0, pwm=false, on_ms=20, period_ms=80이다. min/max는 선택이며 0/255가 기본, 정수 0..255 안으로 제한한다. strength는 지정 범위 내 정수, PWM은 boolean, ON/period는 정수 ms이며 0≤ON≤period, 20≤period≤60000이다. UI는 강도 슬라이더+직접 숫자 입력, PWM 체크, 체크 시 ON/period 입력을 표시한다. 실행 시간은 기존 20ms 반올림 규칙을 따른다. 일반 숫자도 슬라이더+직접 입력이며 step은 슬라이더/증감 간격이다(직접 입력값을 step 배수로 강제하지 않는다). 슬라이더 분할은 최대 1,000,000이다.
+default 테이블은 필수. 테이블 내 생략값은 strength=0, pwm=false, on_ms=20, period_ms=80이다. min/max는 선택이며 0/255가 기본, 정수 0..255 안으로 제한한다. strength는 지정 범위 내 정수, PWM은 boolean, ON/period는 정수 ms이며 0≤ON≤period, 20≤period≤60000이다. UI는 강도 슬라이더+직접 숫자 입력, PWM 체크, 체크 시 ON/period 입력을 표시한다. 실행 시간은 설정한 HID tick 반올림 규칙을 따른다. 일반 숫자도 슬라이더+직접 입력이며 step은 슬라이더/증감 간격이다(직접 입력값을 step 배수로 강제하지 않는다). 슬라이더 분할은 최대 1,000,000이다.
 
 저장 및 context.parameters의 Power는 `{strength:20,pwm:false,on_ms:20,period_ms:80}` 객체다. 복합 파라미터 하나가 상속·Override의 단위이며 내부 필드별 부분 상속은 하지 않는다. Reset All to Global은 선택 효과의 현재 기체 Override 전체를 지운다. 예제는 이 객체에서 constant/pwm 사양을 만들며 파형 선택·게임 판단은 Lua에 남긴다.
 
@@ -102,6 +102,16 @@ dirtyEffects는 최소 표현으로 정리한 현재 효과/모든 기체 Overri
 
 ### haptic_power 출력 사양 직접 사용
 
-vibrate의 두 번째 인수는 기존 mode='constant'/'pwm'/'off' 사양 또는 haptic_power 객체다. mode가 없으면 필수 boolean pwm이 false일 때 Constant, true일 때 PWM으로 해석한다. strength는 정수 0–255, PWM이면 on_ms/period_ms를 기존 규칙으로 검증·양자화하며 duration_ms와 요청 교체 규칙도 동일하다. 명시적 mode는 pwm보다 우선한다. 전달 객체를 수정하지 않으며 파라미터 상속은 기존 configure 단계에서 완료된다. 예: `context:vibrate("Left Gear", context.parameters.Power, 150)`. 동적 파형 작성에 쓰는 기존 헬퍼 API는 변경하지 않는다.
+vibrate의 두 번째 인수는 기존 mode='constant'/'pwm'/'off' 사양 또는 haptic_power 객체다. mode가 없으면 필수 boolean pwm이 false일 때 Constant, true일 때 PWM으로 해석한다. strength는 정수 0–255, PWM이면 on_ms/period_ms를 기존 규칙으로 검증·양자화하며 duration_ms와 요청 교체 규칙도 동일하다. 명시적 mode는 pwm보다 우선한다. 전달 객체를 수정하지 않으며 파라미터 상속은 기존 configure 단계에서 완료된다. 예: `context:vibrate("Left Gear", parameters.Power, 150)`. 동적 파형 작성에 쓰는 기존 헬퍼 API는 변경하지 않는다.
 
 Reset All은 선택 효과의 편집 프로필에 한정한다. Global은 enabled/parameters/outputs를 제거해 기본값을 상속하고, Specific은 해당 효과 Override 전체를 제거해 Global을 상속한다. 다른 효과와 Lua 소스는 변경하지 않는다.
+
+## 분리된 Lua 인수와 진단 계약 (2026-11-11)
+
+하위 호환 분기는 없다. init(context), update(context, telemetry, parameters)를 호출하고 self는 별도 implicit 인수다. context에는 메서드만 둔다. init: parameter/output/log. update: log/vibrate/now()/elapsed()/sample_is_new()/input_valid(). now/elapsed는 호출 기준 단조 ms, 첫 elapsed는 0이다. telemetry는 src/telemetry.h의 지원 SimVar 키 및 sample_id/received_ms/aircraft_key/sim_time_advanced/gears/msfs.paused다. gears[1..3]는 센터/좌/우, MSFS 인덱스 0..2와 대응한다. telemetry와 parameters를 context 안에 복제하지 않는다.
+
+parameters 키는 등록 name의 각 공백 문자를 _로 치환한다. 결과는 ASCII Lua 식별자이며 예약어 금지, 동일 접근 키 중복은 init 오류다. 표시명과 JSON 저장 키는 원래 name이고 실행 인수에는 변환 키만 둔다. default→global→기체 병합 후 변환한다. 자동완성은 init 안의 리터럴 name/type 등록을 읽는다. 동적 계산된 등록 이름의 완성은 지원하지 않는다.
+
+HID 틱은 PC 로컬 tick_ms(5..100, 기본20)이며 PWM 유효 on/period는 HID 루프에서 같은 tick으로 반올림해 순위를 비교한다. 반올림 결과 ON 또는 period=0이면 무출력 후보다. Tick 변경 시 기존 요청/테스트를 지우고 실행 세대를 올려 self를 재초기화한다. UI Telemetry 표시용 재전달은 실제 received_ms와 sample_id를 보존한다. 부가 필드의 비유한 값은 nil/Unavailable이며 필수 9개 입력의 비유한 값은 연결 오류다. 엔진 1..4 표준 SimVar를 구독하며 추력은 Pounds, rpm/N1/N2는 Percent다. 기체별 미지원 값이 0으로 반환되는 것과 실제 0은 SimConnect만으로 구별할 수 없다.
+
+텔레메트리 완성 목록은 src/telemetry.h에 선언한 구독 계약이다. 연결/0값/정체로 지원 필드를 추정해 추가·제거하지 않는다. InputEvent 열거와 표준 SimVar 구독은 별도다. 프로젝트 open 시 effects 하위 디렉토리를 펼치고 아이콘 앞 체크(최상위 effects 제외)는 현재 편집 프로필의 활성화 상태를 제어한다.
