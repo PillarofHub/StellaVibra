@@ -69,17 +69,25 @@ int LuaEffect::api(lua_State* L,int operation) {
         for(const auto& old:parameters) require(old.name!=p.name,"Duplicate parameter");
         lua_getfield(L,2,"type"); if(!lua_isnil(L,-1)) p.type=stringAt(L,-1); lua_pop(L,1);
         lua_getfield(L,2,"default");
-        require(p.type=="boolean" || p.type=="int" || p.type=="float" || p.type=="haptic_power","Unknown parameter type");
+        require(p.type=="boolean" || p.type=="int" || p.type=="float" || p.type=="haptic_power" || p.type=="enum","Unknown parameter type");
         p.boolean=p.type=="boolean";
         if(p.boolean) { require(lua_isboolean(L,-1),"Expected boolean default"); p.initial=bool(lua_toboolean(L,-1)); }
-        else if(p.type=="haptic_power") {
+        else if(p.type=="enum") {
+            p.initial=stringAt(L,-1);lua_getfield(L,2,"choices");require(lua_istable(L,-1),"Expected enum choices");
+            const auto count=lua_rawlen(L,-1);require(count>0 && count<=64,"Expected 1..64 enum choices");
+            const int choices=lua_absindex(L,-1);size_t entries=0;lua_pushnil(L);
+            while(lua_next(L,choices)){require(lua_isinteger(L,-2) && lua_tointeger(L,-2)>=1 && lua_tointeger(L,-2)<=static_cast<lua_Integer>(count),"Enum choices must be a dense array");++entries;lua_pop(L,1);}
+            require(entries==count,"Enum choices must be a dense array");
+            for(size_t i=1;i<=count;++i){lua_rawgeti(L,-1,static_cast<lua_Integer>(i));auto choice=stringAt(L,-1);lua_pop(L,1);require(!p.choices.contains(choice),"Duplicate enum choice");p.choices<<choice;}
+            lua_pop(L,1);require(p.choices.contains(p.initial.toString()),"Enum default is not a choice");
+        } else if(p.type=="haptic_power") {
             require(lua_istable(L,-1),"haptic_power default must be a table");
             int table=lua_absindex(L,-1); QJsonObject h;
             for(auto field:{"strength","on_ms","period_ms"}) { lua_getfield(L,table,field); h[field]=lua_isnil(L,-1)?(QString(field)=="period_ms"?80:QString(field)=="on_ms"?20:0):numberAt(L,-1); lua_pop(L,1); }
             lua_getfield(L,table,"pwm"); require(lua_isnil(L,-1)||lua_isboolean(L,-1),"Expected PWM boolean"); h["pwm"]=bool(lua_toboolean(L,-1)); lua_pop(L,1); p.initial=h;
         } else p.initial=numberAt(L,-1);
         lua_pop(L,1);
-        if(!p.boolean) {
+        if(!p.boolean && p.type!="enum") {
             if(p.type=="haptic_power") {
                 lua_getfield(L,2,"min"); p.minimum=lua_isnil(L,-1)?0:numberAt(L,-1); lua_pop(L,1);
                 lua_getfield(L,2,"max"); p.maximum=lua_isnil(L,-1)?255:numberAt(L,-1); lua_pop(L,1);
@@ -95,7 +103,24 @@ int LuaEffect::api(lua_State* L,int operation) {
         for(const auto& old:parameters)require(parameterAlias(old.name)!=alias,"Parameter access name collision: "+alias);
         parameters<<p; return 0;
     }
-    if(operation==1) { require(registering && outputs.size()<64,"Output registration only in init"); auto name=stringAt(L,2); require(!outputs.contains(name),"Duplicate output"); outputs<<name; return 0; }
+    if(operation==1) {
+        require(registering && outputs.size()<64,"Output registration only in init");
+        require(lua_gettop(L)<=3,"Expected output(name, optional default slots)");
+        auto name=stringAt(L,2);require(!outputs.contains(name),"Duplicate output");QJsonArray defaults;
+        if(!lua_isnoneornil(L,3)) {
+            require(lua_istable(L,3),"Default output slots must be an array");
+            auto count=lua_rawlen(L,3);require(count<=20,"Too many default output slots");
+            size_t entries=0;lua_pushnil(L);
+            while(lua_next(L,3)) {
+                require(lua_isinteger(L,-2) && lua_tointeger(L,-2)>=1 && lua_tointeger(L,-2)<=static_cast<lua_Integer>(count),"Default output slots must be a dense array");
+                ++entries;lua_pop(L,1);
+            }
+            require(entries==count,"Default output slots must be a dense array");
+            for(size_t i=1;i<=count;++i){lua_rawgeti(L,3,static_cast<lua_Integer>(i));auto slot=stringAt(L,-1);lua_pop(L,1);
+                require(logicalSlots().contains(slot),"Unknown default output slot: "+slot);require(!defaults.contains(slot),"Duplicate default output slot: "+slot);defaults.append(slot);}
+        }
+        outputs<<name;outputDefaults[name]=defaults;return 0;
+    }
     if(operation==2) { if(logs.size()<8) logs<<stringAt(L,2); return 0; }
     require(!registering && pending.size()<128,"Invalid output call"); Request r; auto name=stringAt(L,2); require(outputs.contains(name),"Unknown output: "+name); r.key=id+"/"+name;
     require(lua_istable(L,3),"Expected output specification"); lua_getfield(L,3,"mode"); QString mode;
@@ -112,17 +137,20 @@ int LuaEffect::api(lua_State* L,int operation) {
     for(auto v:settings["outputs"].toObject()[name].toArray()) r.destinations<<v.toString();
     pending<<r; return 0;
 }
-void LuaEffect::configure(const QJsonObject& values) {
+void LuaEffect::configure(const QJsonObject& values,const QJsonObject& channelCounts) {
     validateSettings(values,false); settings=values; unresolved.clear(); auto stored=values["parameters"].toObject(); QJsonObject merged; QSet<QString> names;
     for(const auto& p:parameters) {
         auto value=stored.contains(p.name)?stored[p.name]:p.initial;
         auto number=p.type=="haptic_power"?value.toObject()["strength"]:value;
-        require(p.boolean ? value.isBool() : (number.isDouble() && number.toDouble()>=p.minimum && number.toDouble()<=p.maximum && (p.type=="float" || floor(number.toDouble())==number.toDouble())),"Invalid value: "+p.name);
+        require(p.type=="enum" ? (value.isString() && p.choices.contains(value.toString())) : p.boolean ? value.isBool() : (number.isDouble() && number.toDouble()>=p.minimum && number.toDouble()<=p.maximum && (p.type=="float" || floor(number.toDouble())==number.toDouble())),"Invalid value: "+p.name);
         if(p.type=="haptic_power") require(value.isObject(),"Expected haptic_power object");
         merged[p.name]=value; names.insert(p.name);
     }
     for(auto it=stored.begin();it!=stored.end();++it) if(!names.contains(it.key())) unresolved<<"Parameter: "+it.key();
     auto routes=values["outputs"].toObject(); for(auto it=routes.begin();it!=routes.end();++it) if(!outputs.contains(it.key())) unresolved<<"Output: "+it.key(); settings["parameters"]=merged;
+    const auto defaults=fitOutputDefaults(outputDefaults,channelCounts);
+    for(const auto& name:outputs)if(!routes.contains(name))routes[name]=defaults[name];
+    settings["outputs"]=routes;
 }
 void LuaEffect::pushJson(const QJsonValue& v) {
     if(v.isBool()) lua_pushboolean(state,v.toBool()); else if(v.isDouble()) lua_pushnumber(state,v.toDouble()); else if(v.isString()) { auto b=v.toString().toUtf8(); lua_pushlstring(state,b.constData(),b.size()); }
@@ -140,7 +168,7 @@ QList<Request> LuaEffect::update(const Telemetry& t,bool fresh,qint64 now) {
 void LuaEffect::performUpdate() {
     const auto& t=updateTelemetry; const bool fresh=updateFresh;
     lua_rawgeti(state,LUA_REGISTRYINDEX,reference); lua_getfield(state,-1,"update"); lua_pushvalue(state,-2); pushApi();
-    auto telemetry=telemetryObject(t);telemetry["sim_time_advanced"]=fresh && t.advanced;
+    auto telemetry=telemetryObject(t);if(t.game.startsWith("MSFS"))telemetry["sim_time_advanced"]=fresh && t.advanced;
     QJsonObject values;const auto stored=settings["parameters"].toObject();
     for(const auto& p:parameters)values[parameterAlias(p.name)]=stored[p.name];
     pushJson(telemetry);pushJson(values);

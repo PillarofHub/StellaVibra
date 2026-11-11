@@ -2,6 +2,7 @@
 #include "telemetry.h"
 #include <cmath>
 #include <cstring>
+#include <tlhelp32.h>
 #ifdef STELLA_CHECK_SIMCONNECT_SDK
 #include <SimConnect.h>
 #include <cstddef>
@@ -12,21 +13,44 @@ static_assert(sizeof(SIMCONNECT_RECV)==12 && offsetof(SIMCONNECT_RECV_SIMOBJECT_
 static_assert(SIMCONNECT_RECV_ID_SYSTEM_STATE==15 && offsetof(SIMCONNECT_RECV_SYSTEM_STATE,dwRequestID)==12);
 #endif
 namespace sv {
+static void checkLocalSimulator(const QString& game) {
+    // Both versions can publish the default SimConnect pipe. Do not attach to
+    // the wrong game just because its client SDK is backward compatible.
+    auto processes=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+    require(processes!=INVALID_HANDLE_VALUE,"Cannot inspect the local MSFS process");
+    PROCESSENTRY32W entry{};entry.dwSize=sizeof(entry);bool msfs2020=false,msfs2024=false;
+    if(Process32FirstW(processes,&entry))do{const auto name=QString::fromWCharArray(entry.szExeFile);
+        msfs2020|=name.compare("FlightSimulator.exe",Qt::CaseInsensitive)==0;
+        msfs2024|=name.compare("FlightSimulator2024.exe",Qt::CaseInsensitive)==0;
+    }while(Process32NextW(processes,&entry));CloseHandle(processes);
+    require(!(msfs2020 && msfs2024),"Both MSFS versions are running; close the other version to avoid an ambiguous SimConnect server");
+    require(game=="MSFS2020"?msfs2020:msfs2024,game+" is not running locally");
+}
 SimConnect::~SimConnect(){disconnect();}
 void SimConnect::disconnect() { if(handle && closeFunction) closeFunction(handle); handle=nullptr; if(module) FreeLibrary(module); module=nullptr; previous={}; lastPacket.clear(); paused=true; status="Disconnected"; }
-void SimConnect::connect() {
+void SimConnect::connect(const QString& target) {
     disconnect();
-    QString selected=QCoreApplication::applicationDirPath()+"/SimConnect.dll";
-    require(QFileInfo(selected).isFile(),"Bundled SimConnect.dll is missing beside StellaVibra.exe");
+    game=target;
+    checkLocalSimulator(game);
+    QString selected=appRoot()+"/bin/simconnect/"+game+"/SimConnect.dll";
+    require(QFileInfo(selected).isFile(),"Bundled SimConnect.dll is missing: "+selected);
     module=LoadLibraryExW(reinterpret_cast<LPCWSTR>(selected.utf16()),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32);
     require(module!=nullptr,"Cannot load x64 SimConnect.dll (Windows error "+QString::number(GetLastError())+")");
     try {
+        // Close connection handles on retry, but retain code for possible SDK
+        // background callbacks until process exit. This also covers failed Open.
+        HMODULE pinned=nullptr;
+        require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
+            reinterpret_cast<LPCWSTR>(module),&pinned)!=FALSE,"Cannot retain SimConnect client module");
         auto open=reinterpret_cast<Open>(GetProcAddress(module,"SimConnect_Open")); closeFunction=reinterpret_cast<Close>(GetProcAddress(module,"SimConnect_Close"));
         auto add=reinterpret_cast<Add>(GetProcAddress(module,"SimConnect_AddToDataDefinition")); auto request=reinterpret_cast<RequestData>(GetProcAddress(module,"SimConnect_RequestDataOnSimObject"));
         nextFunction=reinterpret_cast<Next>(GetProcAddress(module,"SimConnect_GetNextDispatch")); auto subscribe=reinterpret_cast<Subscribe>(GetProcAddress(module,"SimConnect_SubscribeToSystemEvent"));
         systemStateFunction=reinterpret_cast<SystemState>(GetProcAddress(module,"SimConnect_RequestSystemState"));
         require(open && closeFunction && add && request && nextFunction && subscribe && systemStateFunction,"Missing SimConnect exports");
-        require(SUCCEEDED(open(&handle,"Stella Vibra",nullptr,0,nullptr,0)),"MSFS 2024 connection unavailable");
+        qInfo().noquote()<<"SimConnect Open:"<<game;
+        const auto opened=open(&handle,"Stella Vibra",nullptr,0,nullptr,0);
+        qInfo().noquote()<<"SimConnect Open result:"<<QString::number(quint32(opened),16);
+        require(SUCCEEDED(opened),game+" connection unavailable");
         // Official SIMCONNECT_DATATYPE: FLOAT64=4, STRING256=9.
         for(const auto& field:simVariables()) require(SUCCEEDED(add(handle,1,field.name.toUtf8().constData(),field.unit.toUtf8().constData(),4,0,0xffffffff)),"SimConnect definition failed: "+field.name);
         require(SUCCEEDED(add(handle,1,"TITLE",nullptr,9,0,0xffffffff)),"TITLE definition failed");
@@ -51,12 +75,13 @@ QList<Telemetry> SimConnect::poll() {
         require(length>=DWORD(40+count*8+256) && u32(12)==1 && u32(20)==1 && u32(24)==0,"Unexpected telemetry packet layout");
         QByteArray payload(bytes+40,count*8+256); if(payload==lastPacket) continue; lastPacket=payload;
         QList<double> values(count); memcpy(values.data(),bytes+40,count*8);
-        Telemetry t; t.sequence=previous.sequence+1; t.received=nowMs(); t.simTime=values[0]; t.speed=values[1]; t.ground=values[2]!=0; t.paused=paused;
+        Telemetry t; t.game=game; t.sequence=previous.sequence+1; t.received=nowMs(); t.simTime=values[0]; t.speed=values[1]; t.ground=values[2]!=0; t.paused=paused;
         for(int i=0;i<count;++i){const auto& field=simVariables()[i];t.values[field.key]=!std::isfinite(values[i])?QJsonValue():field.boolean?QJsonValue(values[i]!=0):QJsonValue(values[i]);}
         for(int i=0;i<9;++i)require(std::isfinite(values[i]),"Invalid required telemetry number");
         auto title=QByteArray(bytes+40+count*8,256); int end=title.indexOf('\0'); require(end>0,"Missing aircraft TITLE"); t.aircraft=QString::fromUtf8(title.constData(),end);
         t.advanced=t.simTime>previous.simTime; t.advancedAt=t.advanced?t.received:previous.advancedAt;
         for(int i=0;i<3;++i) { t.contact[i]=values[3+i]!=0; t.animation[i]=values[6+i]; }
+        if(!previous.sequence)qInfo().noquote()<<"First SimConnect telemetry:"<<t.aircraft<<"paused"<<t.paused;
         previous=t; result<<t; status=t.paused?"Connected / paused":"Connected";
     }
     auto now=nowMs();require(!checkDeadline || now<checkDeadline,"MSFS connection check timed out");

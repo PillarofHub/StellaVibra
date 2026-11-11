@@ -6,7 +6,7 @@ namespace sv {
 class SimConnect {
 public:
     ~SimConnect();
-    void connect();
+    void connect(const QString& target);
     void disconnect();
     QList<Telemetry> poll();
     QString status="Disconnected";
@@ -26,6 +26,7 @@ private:
     SystemState systemStateFunction=nullptr;
     qint64 nextCheck=0,checkDeadline=0;
     bool paused=true;
+    QString game;
     Telemetry previous;
     QByteArray lastPacket;
 };

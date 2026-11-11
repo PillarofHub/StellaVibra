@@ -1,9 +1,9 @@
 local effect = {}
 function effect:init(context)
-    context:parameter {name="Power", type="haptic_power", default={strength=20, pwm=true}}
+    context:parameter {name="Power", type="haptic_power", default={strength=20, pwm=false}}
     context:parameter {name="Movement margin ms", type="int", default=200, min=50, max=2000, step=1}
     context:parameter {name="Slat tolerance percent", type="float", default=3, min=0, max=20, step=1}
-    context:output("Airframe")
+    context:output("Airframe", {"Stick:1"})
     self.previous = {}
 end
 function effect:update(context, telemetry, parameters)

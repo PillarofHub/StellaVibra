@@ -5,3 +5,5 @@
 /.vs/
 *.user
 *.log
+StellaVibra.pref
+/diagnostics/

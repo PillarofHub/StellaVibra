@@ -11,6 +11,9 @@ inline void require(bool ok, const QString& message) { if (!ok) throw std::runti
 QJsonObject readJson(const QString& path);
 void writeJson(const QString& path, const QJsonObject& object);
 QStringList logicalSlots();
+QStringList availableSlots(const QJsonObject& counts);
+QJsonObject fitOutputDefaults(const QJsonObject& outputs,const QJsonObject& counts);
+QString appRoot();
 QString localPath();
 QString scriptPath(const QString& project, const QString& relative);
 void validateSettings(const QJsonObject& object, bool partial);
@@ -25,13 +28,13 @@ struct Project {
     QJsonObject resolved(const QJsonObject& effect, const QString& key) const;
     void setOverride(const QString& key, const QString& id, const QJsonObject& value);
 };
-struct Parameter { QString name,type; bool boolean=false; QJsonValue initial; double minimum=0,maximum=255,step=1; };
+struct Parameter { QString name,type; QStringList choices; bool boolean=false; QJsonValue initial; double minimum=0,maximum=255,step=1; };
 struct Telemetry {
     quint64 sequence=0;
     qint64 received=0, advancedAt=0;
     double simTime=0, speed=0;
     bool ground=false, paused=false, advanced=false;
-    QString aircraft;
+    QString aircraft,game;
     QJsonObject values;
     std::array<bool,3> contact{};
     std::array<double,3> animation{};

@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "telemetry.h"
+#include "game_catalog.h"
 namespace sv {
 class Gutter : public QWidget { Editor* editor; public: explicit Gutter(Editor* e):QWidget(e),editor(e){} void paintEvent(QPaintEvent* e) override {editor->paintGutter(e);} };
 class Highlight : public QSyntaxHighlighter {
@@ -41,25 +42,40 @@ void Editor::completeMember() {
     completion->popup()->hide();
     if(isReadOnly() || document()->property("json").toBool())return;
     const auto before=toPlainText().left(textCursor().position());
+    const auto game=property("game").toString();
+    auto lookup=QRegularExpression(R"rx((\btelemetry(?:\.(?:state|indicators))?)\[(["'])([^"'\n]*)$)rx").match(before);
+    // A native game key is intentionally completed inside this one string literal.
+    const auto scan=lookup.hasMatch()?before.left(lookup.capturedStart()):before;
     // Skip strings and comments, including Lua long brackets. Never execute draft code.
-    for(int i=0;i<before.size();) {
-        const bool comment=before.mid(i,2)=="--";
+    for(int i=0;i<scan.size();) {
+        const bool comment=scan.mid(i,2)=="--";
         if(comment)i+=2;
         static const QRegularExpression longBracket("\\[(=*)\\[");
-        auto bracket=longBracket.match(before,i,QRegularExpression::NormalMatch,QRegularExpression::AnchorAtOffsetMatchOption);
+        auto bracket=longBracket.match(scan,i,QRegularExpression::NormalMatch,QRegularExpression::AnchorAtOffsetMatchOption);
         if(bracket.hasMatch()) {
-            auto end=before.indexOf("]"+bracket.captured(1)+"]",i+bracket.capturedLength());
+            auto end=scan.indexOf("]"+bracket.captured(1)+"]",i+bracket.capturedLength());
             if(end<0)return;i=int(end+bracket.captured(1).size()+2);continue;
         }
-        if(comment){auto end=before.indexOf('\n',i);if(end<0)return;i=int(end+1);continue;}
-        if(before[i]=='\'' || before[i]=='"') {
-            auto quote=before[i++];bool closed=false;
-            while(i<before.size()){if(before[i]=='\\'){i+=2;continue;}if(before[i++]==quote){closed=true;break;}}
+        if(comment){auto end=scan.indexOf('\n',i);if(end<0)return;i=int(end+1);continue;}
+        if(scan[i]=='\'' || scan[i]=='"') {
+            auto quote=scan[i++];bool closed=false;
+            while(i<scan.size()){if(scan[i]=='\\'){i+=2;continue;}if(scan[i++]==quote){closed=true;break;}}
             if(!closed)return;continue;
         }
         ++i;
     }
-    auto match=QRegularExpression(R"((\btelemetry(?:\.msfs|\.gears\[[^\]\n]+\])?|parameters(?:\.[A-Za-z_][A-Za-z_0-9]*)?|context|gear)([:.])([A-Za-z_][A-Za-z_0-9]*|)$)").match(before);
+    if(lookup.hasMatch()) {
+        QStringList keys;const auto object=lookup.captured(1);
+        if(game=="XPlane12" && object=="telemetry")for(const auto& field:xplaneVariables())keys<<field.name;
+        if(game=="WarThunder" && object=="telemetry.state")keys=warThunderStateKeys()+property("wtStateKeys").toStringList();
+        if(game=="WarThunder" && object=="telemetry.indicators")keys=warThunderIndicatorKeys()+property("wtIndicatorKeys").toStringList();
+        keys.removeDuplicates();keys.sort();
+        const auto quote=lookup.captured(2);const bool closed=toPlainText().mid(textCursor().position(),1)==quote;
+        for(auto& key:keys){key.replace("\\","\\\\");key.replace(quote,"\\"+quote);if(!closed)key+=quote+"]";}
+        candidates->setStringList(keys);completion->setCompletionPrefix(lookup.captured(3));
+        if(completion->completionCount()){completion->popup()->setCurrentIndex(completion->completionModel()->index(0,0));auto rect=cursorRect();rect.setWidth(480);completion->complete(rect);}return;
+    }
+    auto match=QRegularExpression(R"((\btelemetry(?:\.msfs|\.state|\.indicators|\.gears\[[^\]\n]+\])?|parameters(?:\.[A-Za-z_][A-Za-z_0-9]*)?|context|gear)([:.])([A-Za-z_][A-Za-z_0-9]*|)$)").match(before);
     if(!match.hasMatch())return;
     const auto object=match.captured(1),separator=match.captured(2);QStringList names;
     if(object=="context") {
@@ -68,9 +84,14 @@ void Editor::completeMember() {
     }
 
     else if(separator==".") {
-        if(object.endsWith(".msfs"))names={"paused"};
+        if(game=="WarThunder" && object=="telemetry")names={"state","indicators"};
+        else if(game=="WarThunder" && (object=="telemetry.state" || object=="telemetry.indicators")) {
+            auto keys=object.endsWith(".state")?warThunderStateKeys()+property("wtStateKeys").toStringList():warThunderIndicatorKeys()+property("wtIndicatorKeys").toStringList();
+            for(const auto& key:keys)if(luaIdentifier(key))names<<key;names.removeDuplicates();
+        }
+        else if(object.endsWith(".msfs") && game.startsWith("MSFS"))names={"paused"};
         else if(object=="gear" || object.endsWith(']'))names={"contact","animation_percent"};
-        else if(object=="telemetry") {names={"sample_id","received_ms","sim_time_advanced","aircraft_key","gears","msfs"};for(const auto& field:simVariables())names<<field.key;}
+        else if(object=="telemetry" && game.startsWith("MSFS")) {names={"sample_id","received_ms","sim_time_advanced","aircraft_key","gears","msfs"};for(const auto& field:simVariables())names<<field.key;}
         else if(object=="parameters" || object.startsWith("parameters.")) {
             // Literal registrations in init are sufficient for bundled scripts; no draft execution.
             auto source=toPlainText();auto init=source.indexOf(QRegularExpression(":init\\s*\\("));

@@ -1,7 +1,9 @@
 #include "window.h"
+#include "diagnostics.h"
 int main(int argc,char** argv) {
-    QApplication app(argc,argv); QApplication::setOrganizationName("StellaVibra"); QApplication::setApplicationName("StellaVibra"); QApplication::setApplicationVersion("0.1.0");
+    QApplication app(argc,argv); QApplication::setOrganizationName("StellaVibra"); QApplication::setApplicationName("StellaVibra"); QApplication::setApplicationVersion(STELLA_VERSION);
     const bool check=app.arguments().contains("--ui-check");
+    if(!check)sv::initializeDiagnostics();
     sv::Window window;window.show();
     if(check){
         qInfo("UI check: window shown; hardware, project restore and settings writes disabled");

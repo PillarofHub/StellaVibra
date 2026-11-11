@@ -9,6 +9,8 @@ public:
     ~Window() override;
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
+    bool eventFilter(QObject* watched,QEvent* event) override;
 private:
     Engine engine;
     Project project;
@@ -30,9 +32,16 @@ private:
     QLabel* telemetryStatus;
     qint64 nextTelemetryRefresh=0;
     QByteArray defaultLayout;
+    QList<QDockWidget*> proportionalDocks;
+    QMap<QDockWidget*,QSizeF> dockRatios;
+    QTimer captureLayoutTimer,resizeLayoutTimer;
+    bool resizingLayout=false;
+    QSize dockSpace() const;
+    void captureDockRatios();
+    void applyDockRatios();
     QSet<QString> effectDirectoriesToExpand;
     void expandEffectFolders();
-    void setTickDialog(); void aboutDialog();
+    void setTimingsDialog(); void setChannelsDialog(); void aboutDialog();
     bool paused=false;
     qint64 nextFileScan=0;
     QString selectedId,selectedScript,currentAircraft;

@@ -1,5 +1,7 @@
 #include "engine.h"
 #include "simconnect.h"
+#include "network_telemetry.h"
+#include "game_catalog.h"
 #include "hid.h"
 #include <algorithm>
 #include <tuple>
@@ -20,26 +22,30 @@ void Engine::test(QString motor,Mode mode,int strength,int on,int period,int dur
     testMotor=std::move(motor); testRequest={"test",{},mode,strength,on,period,nowMs()+duration,nowMs()};
 }
 void Engine::setTick(int milliseconds) {require(milliseconds>=5 && milliseconds<=100,"Tick must be 5..100 ms");tickMilliseconds=milliseconds;++generation;std::lock_guard lock(mutex);requests.clear();testMotor.clear();}
+void Engine::setMaximumUpdatePeriod(int milliseconds) {require(milliseconds>=5 && milliseconds<=500,"Maximum update period must be 5..500 ms");maximumUpdateMilliseconds=milliseconds;}
 void Engine::stopTest() { std::lock_guard lock(mutex); testMotor.clear(); }
 Snapshot Engine::snapshot() { std::lock_guard lock(mutex); Snapshot s{simStatus,aircraftKey,execution,motors,logs,mappings,latestTelemetry,telemetryConnected}; logs.clear(); return s; }
 static std::vector<std::unique_ptr<LuaEffect>> instantiate(const Bundle& b,const QString& key) {
     std::vector<std::unique_ptr<LuaEffect>> result;
-    for(auto value:b.project.data["effects"].toArray()) { auto e=value.toObject(); auto path=e["script"].toString(); if(!b.sources.contains(path))continue; auto instance=std::make_unique<LuaEffect>(e["id"].toString(),b.sources.value(path),path); instance->configure(b.project.resolved(e,key)); result.push_back(std::move(instance)); }
+    for(auto value:b.project.data["effects"].toArray()) { auto e=value.toObject(); auto path=e["script"].toString(); if(!b.sources.contains(path))continue; auto instance=std::make_unique<LuaEffect>(e["id"].toString(),b.sources.value(path),path); instance->configure(b.project.resolved(e,key),b.channelCounts); result.push_back(std::move(instance)); }
     return result;
 }
 void Engine::runtimeLoop() {
-    SimConnect sim; Bundle active; bool hasActive=false,wasValid=false; Telemetry telemetry; quint64 localGeneration=0; qint64 lastUpdate=0;
+    SimConnect sim; std::unique_ptr<NetworkTelemetry> network; QString selectedGame; Bundle active; bool hasActive=false,wasValid=false,loggedFirstUpdate=false; Telemetry telemetry; quint64 localGeneration=0; qint64 lastUpdate=0;
     std::vector<std::unique_ptr<LuaEffect>> effects; qint64 nextConnect=0; QString lastConnectionError;
     while(!quitting) {
         auto now=nowMs(); heartbeat=now;
-        std::unique_ptr<Bundle> change; bool connect=false,clear=false; QSet<QString> muted; quint64 revision;
+        std::unique_ptr<Bundle> change; bool clear=false; QSet<QString> muted; quint64 revision;
         { std::lock_guard lock(mutex); change=std::move(pending); revision=projectRevision; clear=clearRequested; clearRequested=false; muted=disabled; }
         if(clear) { effects.clear(); active={}; hasActive=false; }
-        if(!sim.connected() && now>=nextConnect) connect=true;
-        if(connect) {
+        const auto desiredGame=change?change->project.data["game"].toString():hasActive?active.project.data["game"].toString():QString();
+        if(desiredGame!=selectedGame){sim.disconnect();network.reset();selectedGame=desiredGame;telemetry={};wasValid=false;inputDeadline=0;nextConnect=0;++generation;
+            std::lock_guard lock(mutex);requests.clear();}
+        if(!selectedGame.isEmpty() && !sim.connected() && !network && now>=nextConnect){
             nextConnect=now+2000;
-            try { sim.connect(); telemetry={}; ++generation; lastConnectionError.clear(); log("MSFS connected"); }
-            catch(const std::exception& e) { sim.status="Disconnected / retrying"; if(lastConnectionError!=e.what()){lastConnectionError=e.what();log(lastConnectionError);} }
+            try{if(selectedGame.startsWith("MSFS"))sim.connect(selectedGame);else network=std::make_unique<NetworkTelemetry>(selectedGame);
+                telemetry={};++generation;lastConnectionError.clear();log(gameLabel(selectedGame)+" connection started");}
+            catch(const std::exception& e){sim.status="Disconnected / retrying";if(lastConnectionError!=e.what()){lastConnectionError=e.what();log(lastConnectionError);}}
         }
         try {
             if(change) {
@@ -54,7 +60,7 @@ void Engine::runtimeLoop() {
                     auto oldPath=oldEntry["script"].toString();
                     auto old=std::find_if(effects.begin(),effects.end(),[&](const auto& item){return item && item->id==id;});
                     bool sameSource=!change->reloadIds.contains(id) && !oldEntry.isEmpty() && active.sources.value(oldPath)==change->sources.value(path);
-                    bool sameSettings=e==oldEntry;
+                    bool sameSettings=e==oldEntry && change->channelCounts==active.channelCounts;
                     auto keys=change->project.aircraft.keys();for(auto key:active.project.aircraft.keys())if(!keys.contains(key))keys<<key;
                     for(const auto& key:keys)if(change->project.resolved(e,key)!=active.project.resolved(oldEntry,key))sameSettings=false;
                     if(sameSource && sameSettings) {
@@ -64,9 +70,9 @@ void Engine::runtimeLoop() {
                     }
                     try {
                         auto candidate=std::make_unique<LuaEffect>(id,change->sources[path],path);
-                        candidate->configure(change->project.resolved(e,QString()));
-                        for(auto key:change->project.aircraft.keys())candidate->configure(change->project.resolved(e,key));
-                        candidate->configure(change->project.resolved(e,telemetry.aircraft));
+                        candidate->configure(change->project.resolved(e,QString()),change->channelCounts);
+                        for(auto key:change->project.aircraft.keys())candidate->configure(change->project.resolved(e,key),change->channelCounts);
+                        candidate->configure(change->project.resolved(e,telemetry.aircraft),change->channelCounts);
                         if(sameSource && old!=effects.end()) {
                             bool keep=(*old)->settings["enabled"]==candidate->settings["enabled"] && (*old)->settings["outputs"]==candidate->settings["outputs"];
                             (*old)->configure(candidate->settings);if(keep)retained.insert(id);candidate=std::move(*old);
@@ -94,19 +100,19 @@ void Engine::runtimeLoop() {
             }
         } catch(const std::exception& e) { log(QString("Update error: ")+e.what()); }
         try {
-            auto samples=sim.poll();
-            if(samples.isEmpty() && now-lastUpdate>=100) samples<<telemetry;
+            auto samples=network?network->poll():sim.poll();
+            if(samples.isEmpty() && now-lastUpdate>=maximumUpdateMilliseconds.load()) samples<<telemetry;
             for(auto t:samples) {
                 bool fresh=t.sequence!=telemetry.sequence;
                 bool reset=t.aircraft!=telemetry.aircraft || t.simTime<telemetry.simTime || generation.load()!=localGeneration;
-                telemetry=t; now=nowMs(); bool valid=t.valid(now) && sim.connected(); inputDeadline=valid?std::min(t.received+500,t.advancedAt+500):0;
+                telemetry=t; now=nowMs(); bool valid=t.valid(now) && (network?network->connected():sim.connected()); inputDeadline=valid?std::min(t.received+500,t.advancedAt+500):0;
                 if(wasValid && !valid) reset=true; wasValid=valid;
-                if(reset) { localGeneration=generation.load(); { std::lock_guard lock(mutex); requests.clear(); } if(hasActive) effects=instantiate(active,t.aircraft); }
+                if(reset) { loggedFirstUpdate=false;localGeneration=generation.load(); { std::lock_guard lock(mutex); requests.clear(); } if(hasActive) effects=instantiate(active,t.aircraft); }
                 { std::lock_guard lock(mutex); aircraftKey=t.aircraft; execution=running?(hasActive?(valid?"Running":"Running / waiting for valid telemetry"):"Waiting for a project"):"Stopped"; }
                 if(running && ready && hasActive && valid) for(auto& effect:effects) {
                     if(!effect || muted.contains(effect->id) || !effect->settings["enabled"].toBool()) continue;
                     try {
-                        auto commands=effect->update(t,fresh,now); for(const auto& message:effect->takeLogs()) log(effect->id+": "+message);
+                        if(!loggedFirstUpdate){qInfo().noquote()<<"First Lua update in execution generation"<<localGeneration<<"effect"<<effect->id;loggedFirstUpdate=true;}auto commands=effect->update(t,fresh,now); for(const auto& message:effect->takeLogs()) log(effect->id+": "+message);
                         std::lock_guard lock(mutex);
                         if(generation.load()!=localGeneration || !running || disabled.contains(effect->id)) continue;
                         for(auto request:commands) {
@@ -118,8 +124,8 @@ void Engine::runtimeLoop() {
                 }
                 lastUpdate=now;
             }
-        } catch(const std::exception& e) { log(QString("Runtime: ")+e.what()); sim.disconnect(); telemetry={}; inputDeadline=0; ++generation; }
-        { std::lock_guard lock(mutex); simStatus=sim.status;latestTelemetry=telemetry;telemetryConnected=sim.connected(); }
+        } catch(const std::exception& e) { log(QString("Runtime: ")+e.what()); sim.disconnect(); network.reset(); telemetry={}; inputDeadline=0; ++generation; }
+        { std::lock_guard lock(mutex); simStatus=selectedGame.isEmpty()?"No project":network?network->status:sim.status;latestTelemetry=telemetry;telemetryConnected=network?network->connected():sim.connected(); }
         heartbeat=nowMs(); std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
@@ -127,7 +133,7 @@ static bool stronger(const Request& a,const Request& b) {
     return std::tuple{a.mode==Mode::Constant,a.strength,-a.period,a.on}>std::tuple{b.mode==Mode::Constant,b.strength,-b.period,b.on};
 }
 void Engine::hidLoop() {
-    Hid hid; QMap<QString,QString> winners; QSet<QString> touched; auto next=std::chrono::steady_clock::now(); qint64 nextScan=0;
+    Hid hid; QMap<QString,QString> winners; QSet<QString> touched,loggedMotors; auto next=std::chrono::steady_clock::now(); qint64 nextScan=0;
     while(!quitting) {
         const int tick=tickMilliseconds.load();next+=std::chrono::milliseconds(tick); bool scan=false;
         if(nowMs()>=nextScan)scan=true;
@@ -168,7 +174,7 @@ void Engine::hidLoop() {
             int strength=0; if(best) { winners[motor.id]=best->key; if(best->mode==Mode::Constant || (best->mode==Mode::Pwm && (now-best->phase)%best->period<best->on)) strength=best->strength; } else winners.remove(motor.id);
             // No report is sent merely because a device was opened. Once driven, send zero on release.
             if(strength || touched.contains(motor.id)) {
-                QString error; bool ok=hid.write(motor.id,strength,error);
+                if(strength && !loggedMotors.contains(motor.id)){qInfo().noquote()<<"First HID output:"<<motor.id<<"strength"<<strength;loggedMotors.insert(motor.id);}QString error; bool ok=hid.write(motor.id,strength,error);
                 // A failed multi-report write can have partially reached the device. Retry zero after reconnect.
                 if(strength)touched.insert(motor.id);if(!strength && ok)touched.remove(motor.id);
                 std::lock_guard lock(mutex); for(auto& stored:motors) if(stored.id==motor.id) { stored.sent=ok?strength:0; if(!ok) {stored.connected=false;stored.error=error;logs<<motor.label+": "+error;} }

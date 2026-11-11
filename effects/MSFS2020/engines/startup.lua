@@ -1,11 +1,14 @@
 -- Standard SimVars only; no aircraft-specific starter L-vars.
 local effect = {}
 function effect:init(context)
-    context:parameter {name="Power", type="haptic_power", default={strength=20, pwm=true}}
+    context:parameter {name="Power", type="haptic_power", default={strength=20, pwm=false}}
     context:parameter {name="Ignition pulse ms", type="int", default=400, min=20, max=3000, step=1}
     context:parameter {name="Startup limit ms", type="int", default=30000, min=1000, max=60000, step=100}
-    self.engines = {}
-    for i = 1, 4 do context:output("Engine " .. i); self.engines[i] = {} end
+    context:output("Engine 1", {"Throttle:1"})
+    context:output("Engine 2", {"Throttle:2"})
+    context:output("Engine 3", {"Throttle:3"})
+    context:output("Engine 4", {"Throttle:4"})
+    self.engines = {{}, {}, {}, {}}
 end
 function effect:update(context, telemetry, parameters)
     for i = 1, 4 do
@@ -22,7 +25,7 @@ function effect:update(context, telemetry, parameters)
         end
         local cranking = state.started and starter and context:now() - state.started < parameters.Startup_limit_ms
         if context:input_valid() and exists and (cranking or (state.ignition and state.ignition > context:now())) then
-            context:vibrate("Engine " .. i, parameters.Power, 150)
+            context:vibrate("Engine " .. i, parameters.Power, 100)
         else context:vibrate("Engine " .. i, off()) end
     end
 end

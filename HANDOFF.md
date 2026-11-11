@@ -166,3 +166,112 @@ EffectCheckDelegate/EffectTree로 별도 On 열을 없애고 이름 바로 뒤�
 검증은 C++ 컴파일·링크, 기존 Lua 구문 컴파일, diff와 배포 일치 점검이다. 이번에는 앱/테스트/MSFS/HID/모터를 실행하지 않았다. 사용자 확인: effects 루트에 체크 없음 → 하위 폴더와 Lua 아이콘 앞 체크 정렬 → 그룹 부분체크와 Space/마우스 토글. 기존 미커밋 작업 보존, 커밋/푸시 없음.
 
 최종 build.ps1 -Deploy exit0, 프로젝트 컴파일 진단0개, git diff --check 통과, Release/dist EXE 해시 일치. README 검토 결과도 두 배포 폴더에 갱신했다.
+
+## 2026-11-11 — UI 확정 커밋 / 게임별 연결 확장
+
+선행 누적 작업을 사용자 요청에 따라 세 커밋으로 기록했다: d95db7e(Lua 분리·카테고리 효과), 2d08eb0(편집기 UI·레이아웃·체크박스·진단), eb08984(Lua 구문 컴파일·문서). 푸시하지 않았다. 이번 신규 구현은 미커밋 작업 트리에 남긴다.
+
+구현 내용:
+- Project.game에 MSFS2024 / MSFS2020 / XPlane12 / WarThunder 허용. 프로젝트가 선택한 연결만 활성화하며 close/게임 전환은 연결·샘플·출력 요청을 정리한다. 게임을 모르면 다른 게임으로 대체하지 않는다.
+- MSFS58개 숫자/bool+TITLE: 기존48개에 surface_type, g_force, acceleration_body_xyz, incidence_alpha, stall_alpha, gear_total_pct_extended, brake_left/right_position 추가. MSFS2020 공식 SDK0.24.6 DLL 별도 배치. 로컬 MSFS 두 버전 동시 실행은 기본 파이프가 모호하므로 연결 보류하며 로그로 안내한다.
+- X-Plane12: Qt UDP localhost49000 RREF, Aurora의85개 카탈로그. 빠른 값20Hz/느린 값1Hz, 배치 재구독과 해제, 필드별 만료, network_time_sec/pause/acf_descrip 입력 유효성.
+- WT: Qt 비동기 HTTP localhost8111 /state+/indicators, 최대20Hz, 350ms 제한/실패1초 재시도. 원본 JSON 전체 키를 그대로 Lua에 전달. 신뢰할 게임 clock이 없으므로 값 변화 없는500ms는 보수적으로 출력 중지. 새 HTTP 응답과 호스트 재전달을 구분한다.
+- 게임별 Telemetry 뷰·원본 키 자동완성. XP `telemetry["`, WT `telemetry.state["`/`.indicators["`에서 완성. WT 실제 수신 키도 추가. 게임 사이 단위/필드를 공통 telemetry로 변환하지 않는다. C++ 내부 프레임은 실행 관리용 메타데이터만 공유한다.
+- 배포 templates는 effects/<game>/...로 분리. 새 프로젝트는 선택 게임의 하위 파일만 effects/...로 복사. MSFS2024/2020 각11개, XP11개(RPM 기반 엔진 진동), WT8개(AoA cue·수동 과속·플랩/기어 이동·무장·엔진3). WT에 확인되지 않은 바퀴 접촉/압축을 만들어 Ground Roll/Touchdown으로 보고하지 않는다. XP Touchdown은 타이어 수직 압축의 첫 상승만 측정한다.
+- New Project: 없는 절대 폴더는 생성. 기존 폴더는 기본 No 확인 후 프로젝트 파일·이름이 겹치는 기본 스크립트만 QSaveFile로 교체. 나머지 파일과 aircrafts는 보존하고 남은 Lua도 자동 발견한다. 다중 파일 트랜잭션은 아니다.
+
+최종 검증: `.\scripts\build.ps1 -Deploy` exit0. C++ 컴파일·링크 및 전체41개 Lua `luac -p` 통과. 최종 증분 빌드의 프로젝트 컴파일/링크 진단0개, `git diff --check` 통과. SDK 헤더의 기존 signed→DWORD 경고는 전체 재빌드 시 나올 수 있고 번역 제외 windeployqt 경고는 런타임 누락을 뜻하지 않는다. 앱/게임/HID/모터/런타임 테스트는 실행하지 않았다. Release/dist의41개 템플릿 해시·Qt6Network/qwindows 존재·2020 DLL 해시를 확인했다. 두 EXE SHA-256은 동일한 `145D65F7C67E03C2351600274671F07694A398625EE629E6EF795AB807179A62`다. 실행 경로는 `E:\Workspace\Stella Vibra\build\Release\StellaVibra.exe`, 포터블 경로는 `E:\Workspace\Stella Vibra\dist\StellaVibra`다.
+
+사용자 수동 확인:
+1. 없는 경로에 네 게임 각각 새 프로젝트를 만들고 생성된 폴더·스크립트와 게임별 자동완성을 확인한다. 기존 폴더는 No일 때 변경 없음, Yes일 때 안내한 파일만 교체됨을 확인한다.
+2. Stop All 상태로 대상 게임 하나를 시작해 연결 상태와 native 필드·단위를 확인한다. XP localhost UDP49000 및 WT localhost HTTP8111을 사용하는 기본 설정이 필요하다.
+3. Resume 후 한 효과·낮은 세기로 확인한다. 게임 종료/정지/기체 변경/프로젝트 전환/Stop에서 해제되는지 확인한다. XP 타이어/엔진 dataref, WT 무장 번호·AoA·속도 한계·power/RPM 제공 여부는 기체별로 다르다.
+4. WT는 모든 값이 일정하면 실제 비행 중에도500ms 뒤 멈출 수 있다. 공식 clock/pause 부재에 따른 보수적 제한이다. XP RREF는 원자 프레임이 아니라 개별 필드 갱신이며, 커스텀 애드온의 기본 dataref 갱신은 보장하지 않는다.
+
+공식 SDK2020 원본/해시·배포 라이선스 제한은 SIMCONNECT-LICENSING.md에 기록했다. 두 버전의 DLL 동봉은 로컬 개발용이며 공개 재배포 권리 미확인 상태는 그대로다.
+
+## 2026-11-11 — 실행 폴더별 포터블 설정
+
+사용자 요청에 따라 앱 설정 위치를 `%LOCALAPPDATA%\StellaVibra\StellaVibra\local.json`에서 `StellaVibra.exe` 옆 `StellaVibra.pref`로 변경했다. 확장자는 pref이며 기존 UTF-8 JSON version1 스키마와 QSaveFile 원자 저장을 유지한다. 창 크기/위치·도킹 뷰 위치/표시·last_project/recent_projects·모터 매핑·tick_ms가 모두 같은 경로를 사용한다. applicationDirPath 기준이므로 바로가기 시작 위치와 무관하고 실행 폴더별로 분리된다.
+
+기존 AppData 파일은 읽기/자동 이전/삭제하지 않았다. 새 위치에 pref가 없으면 기본값으로 시작하고 첫 설정 저장 시 생성한다. 이전 설정 유지가 필요하면 앱 종료 후 기존 local.json을 실행 폴더의 StellaVibra.pref로 수동 복사한다. 종료 후 pref 삭제로 앱 옵션을 초기화할 수 있다. 실행 폴더 전체 삭제 시 앱 옵션도 삭제되지만 외부 프로젝트 데이터는 보존된다. 실행 폴더 쓰기 권한이 없으면 오류를 표시하며 AppData/레지스트리 우회 저장은 없다. 배포 스크립트는 사용자 pref를 생성하거나 덮어쓰지 않는다. 설정 파일은 Git에서 제외한다.
+
+검증: `.\scripts\build.ps1 -Deploy` exit0, C++ 컴파일·링크 및 Lua 구문 컴파일 통과. `git diff --check` 통과. src의 QSettings/AppLocalDataLocation/QStandardPaths/local.json 참조가 없는 것을 확인했다. Release/dist EXE 해시 일치. 앱·게임·HID·런타임 테스트는 실행하지 않았다. 기존 미커밋 게임 확장 작업 보존, 커밋·푸시 없음.
+
+사용자 확인: 뷰 배치·틱 변경 후 종료 → EXE 옆 pref 생성 → 재실행 복원. 다른 실행 폴더에서는 pref 없이 기본값 시작. 종료 후 pref 삭제 → 마지막 프로젝트·배치·매핑·틱 초기화. 쓰기 불가능한 폴더는 설정 저장 오류가 발생하므로 쓰기 가능한 폴더에서 사용한다.
+
+## 2026-11-11 — Set Timings
+
+Settings → Set Tick을 Set Timings로 변경하고 기존 설명문을 제거했다. HID tick(5..100ms, 기본20), Maximum update period(5..500ms, 기본100), Reset to Defaults, OK/Cancel을 제공한다. 기본값 복원도 OK를 눌러야 적용된다. pref의 tick_ms와 maximum_update_period_ms에 저장·복원하며 새 키가 없으면100ms다.
+
+엔진의 고정100ms 최신 스냅샷 재처리 조건을 atomic 설정값으로 대체했다. 새 텔레메트리는 계속 즉시 처리한다. 최대 간격만 바꿀 때 상태/요청은 유지하며 HID tick 변경의 기존 상태 초기화는 유지한다. 수신 시각·입력 만료500ms·heartbeat250ms·게임 구독·Telemetry 뷰 갱신 간격을 바꾸지 않는다. 실제 호출 간격은 OS/실행 루프 지연의 영향을 받는다.
+
+사용자 확인: 두 값 변경 후 OK → 재실행 값 복원, Reset to Defaults →20/100, Cancel → 기존 값 유지. GUI·게임·HID·런타임 테스트는 실행하지 않는다. 기존 작업 보존, 커밋·푸시 없음.
+
+검증 결과: .\scripts\build.ps1 -Deploy exit0. C++ 컴파일·링크와 Lua 구문 컴파일 통과, git diff --check 통과, Release/dist EXE 해시 일치. 실행 파일은 build/Release/StellaVibra.exe 및 dist/StellaVibra/StellaVibra.exe에 갱신했다. 앱은 실행하지 않았다.
+
+## 2026-11-11 — Lua 출력 기본 논리 슬롯
+
+이전 구현은 New Project의 C++에서 출력 이름(Airframe/Left Gear/Right Gear/Engine N)에 따라 기본 목적지를 생성해 프로젝트 Global outputs에 저장했다. Center Gear는 미배정이었다. 이 규칙을 제거하고 init의 `context:output(name, default_slots)` 등록에 기본값을 옮겼다. 예: `context:output("Center Gear", {"Stick:1"})`. 생략/nil/빈 배열은 미배정. 복수 슬롯 가능, 슬롯 이름과 연속 배열·중복·최대20개를 검증한다.
+
+LuaEffect.outputDefaults를 configure·UI cacheDefaults·최소 저장·리셋·출력 선택창에 반영했다. Script Default→Global→Specific 순서이며 명시적 빈 배열은 상속을 차단한다. 기본값과 같은 Global은 저장에서 제거한다. 새 프로젝트는 outputs 기본값을 복사하지 않으며 이름에 따른 C++ 추측도 없다. 기존 프로젝트 소스/사용자 설정을 자동으로 변경하지 않는다.
+
+모든 게임의41개 기본 Lua에서 output 등록 반복문을 풀었다. Center Gear=Stick:1, Left/Right Gear=Throttle:1/2, Airframe=Stick:1, Engine1..4=Throttle:1..4를 각각 명시한다. 엔진 상태는 명시적 테이블로 초기화하고 update의 출력 처리 반복문 및 Touchdown의 상태 초기화 반복문은 유지한다. 첫 압축 상승 판정 등 게임 효과 알고리즘은 변경하지 않는다.
+
+사용자 확인: 새 프로젝트에서 Center/Left/Right 채널 기본값 확인 → Global 변경/Reset to Default → Specific 변경/Reset to Global → 빈 목록 선택 후 저장·재열기로 미배정 유지 → 기본값과 같으면 sv outputs 항목 생략 → default_slots 생략한 별도 출력은 미배정. 앱·게임·HID·Lua 콜백 테스트는 실행하지 않는다. 기존 미커밋 변경 보존, 커밋·푸시 없음.
+
+검증 결과: .\scripts\build.ps1 -Deploy exit0. C++ 컴파일·링크 및41개 Lua luac -p 통과. 프로젝트 컴파일 진단0개, git diff --check 통과. Release/dist EXE 및 모든41개 Lua 파일의 소스 대비 해시 일치. 앱·런타임 테스트는 실행하지 않았다.
+
+## 2026-11-11 — Browse 새 폴더 생성 / MSFS 시작 시 크래시 조사
+
+Browse 수정: Qt6.8.3 qfiledialog.cpp를 확인했으며 Directory 모드는 없는 경로를 거부하고 선택 버튼도 비활성화한다. New Project Browse를 QFileSystemModel/QTreeView+경로 입력의 폴더 전용 다이얼로그로 변경했다. Select Folder에서 상대 이름은 선택 폴더 기준으로 해석하고 없는 중간 폴더까지 mkpath로 자동 생성한다. 기존 빈 폴더는 New Project의 경고 없이 사용한다. Hidden/System/하위 항목이 하나라도 있는 폴더만 기본 No 덮어쓰기 확인을 유지한다. Browse 취소는 생성하지 않고, 선택 완료 후 New Project 취소는 이미 생성한 폴더를 남긴다. Windows 경로 구분자를 정규화했다. 최초 build.ps1 -Deploy exit0 및 diff/Release-dist 해시 일치를 확인했다.
+
+사용자 크래시 보고: dist/StellaVibra에서 앱을 켠 뒤 MSFS를 실행했고 다른 조작을 하지 않았다. Windows Application 이벤트1000/1001을 읽어 2026-11-11 17:15:11(KST) 해당 EXE의 0xc0000005 접근 위반을 확인했다. 오류 모듈 unknown, WER BEX64/StackHash_c4dc, ReportId84c62189-35fa-4c10-a4f7-5f9473968e5c. 로드 모듈에 배포 SimConnect.dll이 있다. ReportArchive에 Report.wer만 남아 있고 이벤트가 가리킨 임시 .dmp는 존재하지 않는다. 기존 Debug Output은 메모리 전용이었고 빌드 로그는 실행 로그가 아니다. 과거 새벽의 Qt/ucrt 크래시와 이번 이벤트를 동일 원인으로 단정하지 않는다.
+
+정적 검토에서 연결 실패/재시도마다 SDK DLL을 FreeLibrary하는 수명 관리 위험을 발견했다. 연결 핸들은 기존처럼 Close하되 GetModuleHandleEx(FROM_ADDRESS|PIN)으로 실제 로드한 모듈을 프로세스 종료까지 유지하도록 보완했다. Windows 공식 PIN 의미를 확인했지만 이 크래시가 SDK 비동기 콜백/언로드 때문이라는 확증은 없고, 해결 검증도 하지 않았다. 첫 텔레메트리 디코딩·HID 출력에서 이번 주소0 접근 위반을 직접 설명하는 근거도 아직 없다.
+
+추가 진단: 일반 실행에서 EXE 옆 diagnostics/<UTC시각>-PID.log에 Qt 메시지/Debug Output, SimConnect Open/결과 HRESULT, 첫 텔레메트리·첫 Lua update·첫 HID 출력 단계를 기록한다. 매 메시지 flush,2MiB 초과 시 .previous 하나로 회전한다. 레지스트리/AppData 설정 변경이나 자동 업로드는 없다. 처리되지 않은 예외에서 같은 세션명.dmp 생성 시도(MiniDumpNormal+ThreadInfo+UnloadedModules), 원래 Windows 예외 처리는 계속한다. 프로세스 내부 수집이므로 데드락/강제종료/fail-fast/권한 문제 등 모든 실패를 보장하지 않으며 고의 크래시 테스트는 하지 않는다. /Zi 및 /DEBUG로 Release PDB를 생성·동봉해 다음 덤프의 소스 분석을 준비한다.
+
+사용자에게 요청할 확인: 새 dist EXE 실행 → Stop All → MSFS 실행. 이 상태에서도 죽으면 Lua/게임 출력보다 연결 경로를 우선 조사한다. 안정적이면 Resume 후 재발 여부를 확인한다. 재발 시 diagnostics의 해당 .log(.previous 포함)/.dmp 및 당시 StellaVibra.exe/.pdb를 업데이트 전에 보존하고 마지막 동작/시각을 알려준다. 덤프가 없더라도 로그를 남긴다. 기존 사용자 프로젝트·pref는 유지한다. GUI·MSFS·HID·모터 실행은 하지 않았다. 최종 빌드 결과는 아래에 기록한다.
+
+최종 검증: build.ps1 -Deploy exit0. C++ 컴파일·링크 및41개 Lua 구문 컴파일 통과. 프로젝트 코드 진단0개, git diff --check 통과. Release/dist의 EXE와 새 PDB 해시 일치. 앱·MSFS·HID·덤프 생성 테스트는 실행하지 않았다. 기존 미커밋 변경 보존, 커밋·푸시 없음.
+
+## 2026-11-11 — 창 크기 변경 시 뷰 비율 유지
+
+사용자 확인: 이전 배포본에서 MSFS 2024 연결 및 이착륙 시 기대한 진동이 정상 동작했다. 이는 사용자 실기 확인이며, 과거 크래시의 정확한 원인을 덤프로 확정한 것은 아니다.
+
+창이 안정된 시점의 도크 폭/높이 비율을 기억하고 전체 창 resize 후 resizeDocks로 적용한다. 수동 분할선 조절·도크 이동·숨김/표시 이후에는 새 비율을 기억하며 부동 창과 화면 밖 비활성 탭은 제외한다. 자동 크기 재분배 중에는 비율을 다시 수집하지 않아 축소/확대 반복 시 반올림·최소 크기 제약이 누적되는 것을 막는다. 도킹 애니메이션은 꺼서 지연된 배치 변경이 비율 수집과 충돌하지 않게 했다. Reset Default Layout은 대기 중인 이전 비율 적용을 취소한다.
+
+기본 본문/Debug Output은 3:1, 좌우 1:4:1 및 Parameters/Script 1:1은 유지한다. 도크 최소 크기 힌트, 콘텐츠 크기 정책·레이아웃 제약, 내부 분할 패널과 상태표시줄의 최소 폭 제약을 완화했다. 내부 QSplitter는 동일 stretch와 최소 크기 완화로 사용자 비율을 따라 크기를 변경한다. 제목줄/분할선/픽셀 단위 제약은 남고, 아주 작게 줄인 내용은 잘릴 수 있다. layout_version4와 기존 저장 배치를 보존하므로 기존 사용자에게 새 기본 비율을 강제하지 않는다. 새 기본값은 View → Reset Default Layout으로 적용한다. 시작 시 restoreState를 반복 호출하지 않는다.
+
+수동 확인: Reset Default Layout → 창 축소/확대·최대화/복원 → 각 분할선을 임의 비율로 조절 후 다시 창 크기 변경 → Parameters/Script도 비율 유지 확인 → 도크 숨김/표시·부동 분리·재도킹 → 종료/재시작 후 배치 복원. 앱·게임·HID 실행 및 테스트 실행은 하지 않는다. 기존 미커밋 변경 보존, 커밋·푸시 없음.
+
+검증 결과: .\scripts\build.ps1 -Deploy exit0. C++ 컴파일·링크 성공, 컴파일 진단0개. git diff --check 통과. Release/dist EXE 및 PDB 해시 일치. 실행·GUI 리사이즈 동작 검증은 사용자 확인으로 남긴다.
+
+## 2026-11-12 — 기본 Lua 조정, 채널 수, 배포 정리
+
+중단된 작업을 이어 완료한다. MSFS2024/2020 기본11개, XPlane12 11개, WT8개(전체41개)를 대상에 맞춰 수정했다. 일반 갱신 요청150→100ms, Ground Roll strength1/PWM ON/minimum0.1knots/step0.1(X-Plane은 Lua에서 원본m/s 변환), Touchdown minimum200/maximum2000/multiplier2. 그 외 기본 PWM OFF. MSFS/X-Plane Overspeed 수동 한계 제거; WT는 게임 한계 입력이 없어 수동 한계 유지. Shutdown/Thrust/RPM/Power는 haptic_power를 복사하고 strength만 변경해 그대로 전달하며 PWM을 다시 구성하지 않는다. 시동/감쇠/착륙 이벤트 자체의 지속 시간 계산은 유지한다.
+
+Ground Thumps: Power, Slab length(4.6m), Minimum speed, Maximum speed, Pulse ms(100), Ground type만 등록.3개 기어의 접지별 거리 적분으로 가상 경계를 통과할 때만 요청하며 첫 샘플/시간 역행/큰 간격/슬랩 변경을 재설정한다. 놓친 경계는 몰아서 재생하지 않는다. 펄스는 예상 경계 간격의 절반 이하, 재요청은 적어도 같은 길이의 휴지 후에만 허용한다. 강도 합산은 없지만 다른 효과가 계속 선택되면 전체 모터 출력은 이어질 수 있고, HID tick보다 짧은 펄스는 구분 보장 불가. 실제 휠베이스·이음매 위치가 없는 근사 모델이다. FAA Table3-7의15ft(4.6m)를 예제 간격으로 참고했다. MSFS on_any_runway Bool을 추가하여 활주로+surface_type(Concrete0/Asphalt4) 조건 사용. X-Plane 공식 surface_texture_type(Concrete2/Asphalt3) 추가, 유도로/계류장 구분 불가. WT 지상 입력을 추정해 추가하지 않았다. 카탈로그는MSFS59+TITLE, XP86.
+
+Set Channels: Yoke/Stick/Throttle/Rudder0..4, 기본4; pref channels 키는 Yoke/Stick/Throttle/Pedal. 기존Wheel4 유지. 기본 출력만0이면비움/초과면(번호-1)%개수+1/중복제거. UI 캐시·리셋·최소저장·runtime configure에 동일하게 적용한다. 엔진 Bundle에 counts를 전달하고 counts 변경도 설정 변경으로 인식해 재적용한다. 명시적 프로젝트/기체/물리 매핑은 그대로 유지한다. 노면 선택용 enum 파라미터(문자열default/choices1..64개 연속·중복없음) 추가, 문자열 저장과 드롭다운을 지원한다. 숫자는 QDoubleSpinBox textFromValue에서 로캘 소수점 뒤0만 잘라 값/입력 정밀도를 보존한다. 파라미터 Form은 상단정렬, 각 행은 세로Fixed로 제한한다.
+
+배포: 루트 StellaVibra.exe는 정적CRT Win32 런처이며 bin/StellaVibra.exe를 실행한다. dumpbin에서 런처 의존성이 KERNEL32/USER32뿐임을 확인했다. Qt/MSVC DLL=bin, Qt plugins=bin/plugins+qt.conf, SimConnect=bin/simconnect/MSFS2024 또는MSFS2020. 문서=docs, PDB=bin, 라이선스=licenses, 소스=sources, 템플릿=effects, 진단=diagnostics. pref와 템플릿/고지는 실제 앱의 부모 배포루트 기준이다. 루트/실제 앱 모두 같은 폴더 옵션을 사용한다. build Release의 LuaCompiler/lib는 tools/lib로 분리했다. 초기 배포는 이전 생성파일 정리의 Remove-Item 오류로 중단되었으나 -Force 및 정확한 오류 위치 표시를 적용한 뒤 정상 완료했다. 사용자 pref/프로젝트 및 알 수 없는 파일은 정리 대상에서 제외했다. SimConnect 공개재배포 권리 미확인 결론은 그대로다.
+
+기존 사용자 프로젝트 Lua/Global/Specific을 자동 덮어쓰지 않았다. 새 프로젝트로 확인하거나 필요한 Lua만 직접 복사한 뒤 예전 Override를 Reset to Default/Global로 정리해야 새 기본값이 보인다. 수동 검증: 루트 EXE 실행→기존pref 복원→새MSFS2024 프로젝트→숫자/위쪽정렬/Power·Touchdown 기본값→Set Channels에서Stick0/Throttle2로 미배정·순환 확인→리셋/저장/재열기→노면드롭다운→실기에서 활주로/유도로/노면·속도 범위·개별기어 Thumps 및 타효과 우선순위 확인. X-Plane/WT도 해당게임 실기 확인이 필요하다. 앱·게임·HID·Lua 콜백·런처 실행 테스트는 하지 않았다. 커밋·푸시 없음.
+
+최종 검증: .\scripts\build.ps1 -Deploy exit0. C++ 컴파일·링크와41개 Lua luac -p 구문 컴파일 통과. git diff --check 통과. Release/dist 런처·실제앱·PDB·qt.conf·두 SimConnect DLL 해시 일치,41개 Lua는 소스/Release/dist 모두 일치. 최상위 파일은 Release=EXE/README/LICENSE, dist=EXE/README/LICENSE/기존pref뿐이다. 최종 문서도 양쪽 배포 폴더에 반영했다. 실행 검증은 하지 않았다.
+
+## 2026-11-12 — File 메뉴 순서
+
+Close Project를 Open Recent 바로 아래로 이동하고 그 뒤 구분선으로 Save/Save All/Close File과 나눴다. 기존 닫기 동작과 미저장 확인은 유지한다. build.ps1 -Deploy exit0, 컴파일·링크 및 diff --check 통과. Release/dist 갱신 완료. 앱 실행·테스트·커밋 없음.
+
+## 2026-11-12 — 0.2.0 로컬 체크포인트
+
+사용자 요청에 따라 현재까지의 누적 구현을0.2.0으로 올리고 한 번의 로컬 커밋으로 보존한다. CMake PROJECT_VERSION을 기준으로 Qt applicationVersion/About을 연결하고, 실제 앱과 루트 런처 모두 Windows VERSIONINFO FileVersion/ProductVersion0.2.0 리소스를 생성한다. 프로젝트/pref 파일 스키마 version1은 변경하지 않는다. README 버전도 갱신했다. 소스·기본 Lua·문서·빌드 스크립트만 선택적으로 stage하며 .deps/build/dist/pref/로그/DLL은 Git에 추가하지 않는다.
+
+다음 순서: DCS 연결 구현 → 충분한 실기 테스트 → 사용자 지시에 따른 GitHub 연결·푸시·배포. 이번에는 DCS 구현/설치나 GitHub 연결/푸시/릴리스/태그 생성은 하지 않는다. SimConnect 공개 재배포 권리 확인은 기존 미해결 과제로 유지한다.
+
+DCS 검토: Saved Games의 활성 DCS 프로필 Scripts/Export.lua에서 Stella 전용 exporter를 로드하고 LuaExportStart/AfterNextFrame/Stop 등의 콜백으로 샘플을 수집해 localhost UDP로 전달하는 방안을 설명한다. 기존 Export.lua와 콜백 체인을 보존해야 한다. DCS-BIOS의 설치 안내 및 BIOS.lua 실제 구현이 로더 추가, LuaSocket, 기존 콜백 체인, export_rate 기반 실행 사례다(https://github.com/DCS-Skunkworks/dcs-bios 및 Scripts/DCS-BIOS/BIOS.lua). DCS 내 exporter는 텔레메트리 수집/전송만, Stella의 Lua는 효과 판정, C++은 수신/유효기간/실행/파형/HID를 맡는 제안이다. 기본20Hz와 필요한 빠른 항목50Hz는 검증 전 제안값이며 게임 프레임/시뮬레이션 시간의 제약을 받는다. 기체 이름/세션/순번/모델 시간과 수신 시각으로 재연결·pause·오래된 입력을 처리해야 한다. 기체별 접지/서스펜션·시동·경고 신호는 제공 여부·단위를 확인하고 미지원은 nil로 유지한다. 다른 게임과 공통 텔레메트리로 추상화하지 않는다. 멀티플레이에서는 서버의 export 허용 설정도 영향이 있으므로 자체항공기 데이터 사용 범위를 확인해야 한다(Tacview 공급자 문서 https://raia-software-inc.gitbook.io/tacview/flight-simulator/dcs-world/multiplayer-flights-as-host).
+
+0.2.0 검증: build.ps1 -Deploy exit0, C++ 컴파일·링크 및41개 Lua 구문 컴파일 통과. Release/dist 런처와 실제 EXE 네 파일의 FileVersion/ProductVersion이 모두0.2.0, 런처/앱/PDB 해시 일치. 앱 실행·게임·HID·런타임 테스트는 수행하지 않았다. 이번 상태를 사용자 요청의 로컬 커밋으로 기록한다.

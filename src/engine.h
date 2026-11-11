@@ -6,7 +6,7 @@
 #include <thread>
 #include <memory>
 namespace sv {
-struct Bundle { Project project; QMap<QString,QString> sources; QSet<QString> reloadIds; };
+struct Bundle { Project project; QMap<QString,QString> sources; QSet<QString> reloadIds; QJsonObject channelCounts; };
 struct Snapshot { QString sim="Disconnected",aircraft,execution="Stopped"; QList<Motor> motors; QStringList logs; QJsonObject mappings; Telemetry telemetry; bool telemetryConnected=false; };
 class Engine {
 public:
@@ -21,6 +21,8 @@ public:
     Snapshot snapshot();
     void setTick(int milliseconds);
     int tickMs() const {return tickMilliseconds.load();}
+    void setMaximumUpdatePeriod(int milliseconds);
+    int maximumUpdatePeriodMs() const {return maximumUpdateMilliseconds.load();}
 private:
     std::mutex mutex;
     std::thread runtimeThread,hidThread;
@@ -39,6 +41,7 @@ private:
     QString simStatus="Disconnected",aircraftKey,execution="Stopped";
     Request testRequest;
     std::atomic<int> tickMilliseconds=20;
+    std::atomic<int> maximumUpdateMilliseconds=100;
     Telemetry latestTelemetry;
     bool telemetryConnected=false;
     QString testMotor;

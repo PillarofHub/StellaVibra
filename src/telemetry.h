@@ -9,6 +9,7 @@ inline const QList<SimVariable>& simVariables() {
             {"sim_time_s","ABSOLUTE TIME","Seconds"},
             {"ground_speed_knots","GROUND VELOCITY","Knots"},
             {"on_ground","SIM ON GROUND","Bool",true},
+            {"on_any_runway","ON ANY RUNWAY","Bool",true},
             {"gear_contact_0","GEAR IS ON GROUND:0","Bool",true},
             {"gear_contact_1","GEAR IS ON GROUND:1","Bool",true},
             {"gear_contact_2","GEAR IS ON GROUND:2","Bool",true},
@@ -25,7 +26,17 @@ inline const QList<SimVariable>& simVariables() {
             {"trailing_edge_flaps_right_percent","TRAILING EDGE FLAPS RIGHT PERCENT","Percent"},
             {"leading_edge_flaps_left_percent","LEADING EDGE FLAPS LEFT PERCENT","Percent"},
             {"leading_edge_flaps_right_percent","LEADING EDGE FLAPS RIGHT PERCENT","Percent"},
-            {"number_of_engines","NUMBER OF ENGINES","Number"}
+            {"number_of_engines","NUMBER OF ENGINES","Number"},
+            {"surface_type","SURFACE TYPE","Enum"},
+            {"g_force","G FORCE","GForce"},
+            {"acceleration_body_x","ACCELERATION BODY X","Feet per second squared"},
+            {"acceleration_body_y","ACCELERATION BODY Y","Feet per second squared"},
+            {"acceleration_body_z","ACCELERATION BODY Z","Feet per second squared"},
+            {"incidence_alpha","INCIDENCE ALPHA","Radians"},
+            {"stall_alpha","STALL ALPHA","Radians"},
+            {"gear_total_pct_extended","GEAR TOTAL PCT EXTENDED","Percent"},
+            {"brake_left_position","BRAKE LEFT POSITION","Position"},
+            {"brake_right_position","BRAKE RIGHT POSITION","Position"}
         };
         for(int i=1;i<=4;++i)for(const auto& field:QList<SimVariable>{
             {"general_eng_combustion","GENERAL ENG COMBUSTION","Bool",true},
@@ -41,6 +52,7 @@ inline const QList<SimVariable>& simVariables() {
 }
 inline QJsonObject telemetryObject(const Telemetry& t) {
     if(!t.sequence)return {};
+    if(t.game=="WarThunder" || t.game=="XPlane12")return t.values;
     auto result=t.values;QJsonArray gears;
     for(int i=0;i<3;++i)gears.append(QJsonObject{{"contact",t.contact[i]},{"animation_percent",t.animation[i]}});
     result["sample_id"]=double(t.sequence);result["received_ms"]=double(t.received);

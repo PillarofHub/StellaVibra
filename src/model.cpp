@@ -1,3 +1,4 @@
+#include "game_catalog.h"
 #include "model.h"
 #include <cmath>
 namespace sv {
@@ -14,7 +15,21 @@ void writeJson(const QString& path,const QJsonObject& object) {
     auto bytes=QJsonDocument(object).toJson(); require(file.write(bytes)==bytes.size() && file.commit(),"Cannot commit "+path);
 }
 QStringList logicalSlots() { QStringList result; for(auto c:{"Yoke","Stick","Throttle","Pedal","Wheel"}) for(int i=1;i<=4;++i) result << QString("%1:%2").arg(c).arg(i); return result; }
-QString localPath() { return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/local.json"; }
+QStringList availableSlots(const QJsonObject& counts) {
+    QStringList result;for(const auto& slot:logicalSlots())if(slot.section(':',1).toInt()<=std::clamp(counts[slot.section(':',0,0)].toInt(4),0,4))result<<slot;return result;
+}
+QJsonObject fitOutputDefaults(const QJsonObject& outputs,const QJsonObject& counts) {
+    QJsonObject result;
+    for(auto it=outputs.begin();it!=outputs.end();++it){QJsonArray destinations;
+        for(const auto& value:it.value().toArray()){auto slot=value.toString();auto category=slot.section(':',0,0);int count=std::clamp(counts[category].toInt(4),0,4);
+            if(count){auto fitted=category+":"+QString::number((slot.section(':',1).toInt()-1)%count+1);if(!destinations.contains(fitted))destinations<<fitted;}}
+        result[it.key()]=destinations;
+    }return result;
+}
+QString appRoot() { return QDir(QCoreApplication::applicationDirPath()).dirName().compare("bin",Qt::CaseInsensitive)==0?QDir::cleanPath(QCoreApplication::applicationDirPath()+"/.."):QCoreApplication::applicationDirPath(); }
+// Preferences belong to this executable directory, independent of the working
+// directory and Windows user profile. Do not fall back to machine-wide storage.
+QString localPath() { return appRoot()+"/StellaVibra.pref"; }
 QString scriptPath(const QString& project,const QString& relative) {
     require(!relative.isEmpty() && QDir::isRelativePath(relative),"Script path must be relative");
     auto base=QFileInfo(project).absolutePath(); auto clean=QDir::cleanPath(QDir(base).absoluteFilePath(relative));
@@ -38,7 +53,7 @@ void validateSettings(const QJsonObject& o,bool partial) {
             auto h=v.toObject(); require(h.size()==4 && h["pwm"].isBool(),"Invalid haptic_power value");
             for(auto k:{"strength","on_ms","period_ms"}) require(h[k].isDouble() && std::isfinite(h[k].toDouble()) && floor(h[k].toDouble())==h[k].toDouble(),"Invalid haptic_power number");
             require(h["strength"].toDouble()>=0 && h["strength"].toDouble()<=255 && h["on_ms"].toDouble()>=0 && h["period_ms"].toDouble()>=20 && h["period_ms"].toDouble()<=60000 && h["on_ms"].toDouble()<=h["period_ms"].toDouble(),"Invalid haptic_power range");
-        } else require(v.isBool() || (v.isDouble() && std::isfinite(v.toDouble())),"Invalid parameter value");
+        } else require(v.isBool() || (v.isString() && !v.toString().isEmpty() && v.toString().size()<=512) || (v.isDouble() && std::isfinite(v.toDouble())),"Invalid parameter value");
     }
     auto outputs=o["outputs"].toObject(); for(auto it=outputs.begin();it!=outputs.end();++it) {
         require(it.value().isArray(),"Output destinations must be an array"); QSet<QString> used;
@@ -48,7 +63,7 @@ void validateSettings(const QJsonObject& o,bool partial) {
 void Project::load(const QString& file,const QMap<QString,QJsonObject>& replacements) {
     auto read=[&](const QString& path){auto absolute=QFileInfo(path).absoluteFilePath();QJsonObject o;bool replaced=false;for(auto it=replacements.begin();it!=replacements.end();++it)if(it.key().compare(absolute,Qt::CaseInsensitive)==0){o=it.value();replaced=true;break;}if(!replaced)o=readJson(path);require(o["version"]==1,"Unsupported file version: "+path);return o;};
     Project next; next.path=QFileInfo(file).absoluteFilePath(); next.data=read(file);
-    require(next.data["id"].isString() && !next.data["id"].toString().isEmpty() && next.data["name"].isString() && next.data["game"]=="MSFS2024" && next.data["effects"].isArray(),"Invalid project schema");
+    require(next.data["id"].isString() && !next.data["id"].toString().isEmpty() && next.data["name"].isString() && targetGames().contains(next.data["game"].toString()) && next.data["effects"].isArray(),"Invalid project schema");
     require(next.data["effects"].toArray().size()<=64,"At most 64 effects are supported");
     QSet<QString> ids, paths;
     for(auto value:next.data["effects"].toArray()) {

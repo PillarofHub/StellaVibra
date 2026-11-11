@@ -55,7 +55,7 @@ void Window::saveAll() {
     project.save();savedProject=project;for(int i=0;i<openFiles->count();++i){auto* doc=static_cast<Editor*>(openFiles->widget(i));doc->setProperty("savedText",doc->toPlainText());}drafts.clear();dirtyEffects.clear();dirty=false;setWindowModified(false);apply();refreshRawTabs();updateTabs();rebuildParameters();addLog("Saved all scripts and parameters");
 }
 void Window::apply(const QString& reloadId) {
-    if(project.path.isEmpty())return;Bundle bundle;bundle.project=project;
+    if(project.path.isEmpty())return;Bundle bundle;bundle.project=project;bundle.channelCounts=local["channels"].toObject();
     for(auto v:project.data["effects"].toArray()) {
         auto e=v.toObject();auto relative=e["script"].toString();auto path=scriptPath(project.path,relative);
         try {if(QFileInfo::exists(path))bundle.sources[relative]=sourceText(path);} catch(const std::exception& error){addLog(error.what());}
@@ -68,7 +68,7 @@ QString Window::tabPath(int index) const {auto* w=openFiles->widget(index);retur
 void Window::removeTab(int index){if(index<0)return;auto path=tabPath(index);auto* w=openFiles->widget(index);openFiles->removeWidget(w);fileTabs->removeTab(index);delete w;rawBases.remove(path);}
 void Window::clearTabs(){while(openFiles->count())removeTab(0);editor=nullptr;rawBases.clear();}
 bool Window::hasRawDrafts() const {for(auto path:drafts.keys())if(path.endsWith(".sv",Qt::CaseInsensitive))return true;return false;}
-void Window::cacheDefaults(const QString& id,const LuaEffect& meta){QJsonObject values,ports;for(const auto& p:meta.parameters)values[p.name]=p.initial;for(auto name:meta.outputs)ports[name]=QJsonArray{};effectDefaults[id]=QJsonObject{{"enabled",true},{"parameters",values},{"outputs",ports}};}
+void Window::cacheDefaults(const QString& id,const LuaEffect& meta){QJsonObject values,ports;for(const auto& p:meta.parameters)values[p.name]=p.initial;ports=fitOutputDefaults(meta.outputDefaults,local["channels"].toObject());effectDefaults[id]=QJsonObject{{"enabled",true},{"parameters",values},{"outputs",ports}};}
 void Window::refreshDefaults(){
     effectDefaults.clear();
     for(auto v:project.data["effects"].toArray()){auto e=v.toObject();auto relative=e["script"].toString();try{LuaEffect meta(e["id"].toString(),sourceText(scriptPath(project.path,relative)),relative);cacheDefaults(e["id"].toString(),meta);}catch(const std::exception& error){addLog(QString("Default metadata unavailable; settings preserved: ")+error.what());}}
@@ -97,7 +97,7 @@ void Window::activateTab(){
 void Window::showScript(const QString& relative){
     auto path=scriptPath(project.path,relative);int index=tabIndex(relative);
     if(index<0){
-        auto text=drafts.contains(relative)?drafts[relative]:sourceText(path);auto* document=new Editor;
+        auto text=drafts.contains(relative)?drafts[relative]:sourceText(path);auto* document=new Editor;document->setProperty("game",project.data["game"].toString());
         document->setProperty("path",relative);document->document()->setProperty("json",relative.endsWith(".sv",Qt::CaseInsensitive));document->setPlainText(text);
         document->setProperty("savedText",document->toPlainText());
         if(relative.endsWith(".sv",Qt::CaseInsensitive))rawBases[relative]=sourceText(path);

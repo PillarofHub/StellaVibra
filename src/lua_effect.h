@@ -10,10 +10,11 @@ public:
     LuaEffect(const LuaEffect&)=delete;
     QList<Parameter> parameters;
     QStringList outputs;
+    QJsonObject outputDefaults;
     QString id;
     QJsonObject settings;
     QStringList unresolved;
-    void configure(const QJsonObject& values);
+    void configure(const QJsonObject& values,const QJsonObject& channelCounts={});
     QList<Request> update(const Telemetry& telemetry,bool fresh,qint64 now);
     QStringList takeLogs();
 private:
