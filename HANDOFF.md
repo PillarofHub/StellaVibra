@@ -275,3 +275,25 @@ Close Project를 Open Recent 바로 아래로 이동하고 그 뒤 구분선으�
 DCS 검토: Saved Games의 활성 DCS 프로필 Scripts/Export.lua에서 Stella 전용 exporter를 로드하고 LuaExportStart/AfterNextFrame/Stop 등의 콜백으로 샘플을 수집해 localhost UDP로 전달하는 방안을 설명한다. 기존 Export.lua와 콜백 체인을 보존해야 한다. DCS-BIOS의 설치 안내 및 BIOS.lua 실제 구현이 로더 추가, LuaSocket, 기존 콜백 체인, export_rate 기반 실행 사례다(https://github.com/DCS-Skunkworks/dcs-bios 및 Scripts/DCS-BIOS/BIOS.lua). DCS 내 exporter는 텔레메트리 수집/전송만, Stella의 Lua는 효과 판정, C++은 수신/유효기간/실행/파형/HID를 맡는 제안이다. 기본20Hz와 필요한 빠른 항목50Hz는 검증 전 제안값이며 게임 프레임/시뮬레이션 시간의 제약을 받는다. 기체 이름/세션/순번/모델 시간과 수신 시각으로 재연결·pause·오래된 입력을 처리해야 한다. 기체별 접지/서스펜션·시동·경고 신호는 제공 여부·단위를 확인하고 미지원은 nil로 유지한다. 다른 게임과 공통 텔레메트리로 추상화하지 않는다. 멀티플레이에서는 서버의 export 허용 설정도 영향이 있으므로 자체항공기 데이터 사용 범위를 확인해야 한다(Tacview 공급자 문서 https://raia-software-inc.gitbook.io/tacview/flight-simulator/dcs-world/multiplayer-flights-as-host).
 
 0.2.0 검증: build.ps1 -Deploy exit0, C++ 컴파일·링크 및41개 Lua 구문 컴파일 통과. Release/dist 런처와 실제 EXE 네 파일의 FileVersion/ProductVersion이 모두0.2.0, 런처/앱/PDB 해시 일치. 앱 실행·게임·HID·런타임 테스트는 수행하지 않았다. 이번 상태를 사용자 요청의 로컬 커밋으로 기록한다.
+
+## 2026-11-12 — 승인된 별 아이콘 적용
+
+사용자가 선택한 두 번째 이미지(노란 통통한 네 갈래 별, 하늘색 진동선, 기존 남색 둥근 배경)를 assets/stella-vibra.png로 원본 그대로 복사했다. scripts/make-icon.ps1은 System.Drawing으로 투명도를 유지하며16/20/24/32/48/64/128/256px PNG 프레임을 포함한 ICO를 생성한다. 이미지를 새로 그리거나 색/형태를 수정하지 않았다. src/version.rc.in의 ICON 리소스는 런처와 실제 EXE에 공통 적용하며 Qt 리소스의 PNG를 QApplication::setWindowIcon으로 앱 창·대화상자에 사용한다. 외부 파일 없이 실행 가능하다. 버전0.2.0 유지. 프로젝트 로고는 동일 심볼을 권장하고 이름을 옆에 붙이는 가로형은 제안만 했으며 추가 도안 생성이나 README 로고 배치는 하지 않았다. 이번 작업의 커밋·푸시는 요청되지 않아 하지 않는다. 앱/게임/HID 실행 없이 컴파일·리소스 구조·배포 해시·diff를 점검한다.
+
+검증 결과: build.ps1 -Deploy exit0. C++/RC/Qt 리소스 컴파일·링크 통과. 원본 PNG1254x1254 및 투명 모서리 확인, ICO8개 프레임 구조 확인. EXE를 실행하지 않고 AS_DATAFILE로 읽어 dist 런처와 실제 앱의 아이콘 그룹 리소스ID1 존재 확인. 두 EXE의 Release/dist 해시 일치, diff --check 통과. 실제 탐색기/작업표시줄 렌더링은 사용자 확인으로 남긴다.
+
+## 2026-11-12 — 프로젝트 로고와 README
+
+승인 아이콘을 참조해 내장 image_gen으로 가로형 로고 assets/stella-vibra-logo.png를 생성했다. Stella는 노란색, Vibra는 하늘색이며 배경은 남색이다. 밝은 README 테마에서 노란 글씨의 대비가 낮아지는 것을 막기 위해 배경을 포함했다. 출력에서 철자/색/심볼 구성을 육안 확인했다. README 제목 아래720px 폭과 대체 텍스트로 등재했고 CMake install에 로고를 추가하여 Release/dist README의 상대경로도 작동하게 한다. assets/README.md에 용도·생성 방식·원문 프롬프트를 기록했다. 기존 앱 아이콘·버전은 유지, 커밋/푸시/앱 실행은 하지 않는다.
+
+검증: build.ps1 -Deploy exit0, diff --check 통과. 소스/Release/dist 로고 및 README 해시 일치, 상대 이미지 경로 존재 확인. 생성된 로고의 Stella Vibra 철자와 배색을 확인했다. GitHub 업로드나 브라우저 README 렌더링 검증은 하지 않았다.
+
+## 2026-11-12 — 0.2.0 사용자 문서와 릴리스 정리
+
+기존 한국어 README를 docs/DEVELOPMENT.md로 이동하고 루트 README.md를 GitHub 사용자용 영어 소개·시작 안내로 교체했다. docs/MANUAL.md에는 프로젝트/저장, 상속·라우팅, 게임 연결, Lua API, 설정·진단을 설명했다. docs/RELEASE-NOTES-0.2.0.md와 내부 RELEASE-CHECKLIST.md는 현재 네 게임의 기능 범위, 검증 한계, 수동 확인 및 공개 배포 전 조건을 구분한다. THIRD-PARTY-NOTICES.md도 docs로 옮기고 영어로 정리했다. AGENTS/WORKFLOWS의 문서 역할과 읽기 경로를 갱신했다. 이전 DCS 선행 계획 대신 최신 요청에 따라 현재 기능을0.2.0으로 고정하며 DCS는 후속 작업이다.
+
+Help → README / User Manual(F1)에 비모달 오프라인 Markdown 뷰어를 추가했다. Back/Forward/Home과 문서 상대 링크를 지원하며 웹 링크는 사용자가 클릭하면 브라우저에서 연다. CMake install로 사용자 문서·로고를 Release/dist에 동봉한다. 이전 배포 폴더의 내부 CONTRACTS/SIMCONNECT-LICENSING 문서만 정리하고 사용자 pref·프로젝트·진단은 보존한다. 임시 --ui-check 자동 레이아웃 확인 분기를 제거했으며 일반 로그/크래시 덤프는 유지한다. 승인된 아이콘·프로젝트 로고의 앞선 미커밋 변경도 이번 사용자 요청에 따른 로컬 커밋에 포함한다. GitHub 연결/푸시/태그/공개 업로드는 수행하지 않는다.
+
+검증: .\scripts\build.ps1 -Deploy exit0. C++/RC 컴파일·링크 및41개 Lua 구문 컴파일 통과. 사용자 문서/이미지 상대경로18개 존재 확인, 소스와 Release/dist 문서·로고 해시 일치, 두 배포 폴더의 런처/앱/PDB 해시 일치, EXE 네 파일 ProductVersion0.2.0 확인. diff --check 통과. 앱 실행·테스트·게임·HID/모터 동작은 수행하지 않았다. Help 렌더링·페이지 이동·F1과 최종 패키지 실기 회귀 검증은 사용자 확인 항목이다. 실행 경로: build/Release/StellaVibra.exe 또는 dist/StellaVibra/StellaVibra.exe.
+
+공개 배포의 미해결 항목: 공식 SimConnect 클라이언트의 공개 재배포 권리는 아직 확인되지 않았다. 소스 MIT와 SDK DLL 권리는 별개이며, 현재 dist는 로컬 실행용 준비 폴더다. 공개 패키징 시 개인 pref/diagnostics/프로젝트를 제외해야 한다. 해당 내용을 영어 릴리스 노트·제3자 고지와 내부 체크리스트에 명시했다.

@@ -42,6 +42,7 @@ private:
     QSet<QString> effectDirectoriesToExpand;
     void expandEffectFolders();
     void setTimingsDialog(); void setChannelsDialog(); void aboutDialog();
+    void showDocumentation(const QString& relative,const QString& title);
     bool paused=false;
     qint64 nextFileScan=0;
     QString selectedId,selectedScript,currentAircraft;

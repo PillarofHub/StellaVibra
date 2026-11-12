@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <tuple>
 namespace sv {
-Engine::Engine() { if(QCoreApplication::arguments().contains("--ui-check")){running=false;return;}runtimeThread=std::thread([this]{runtimeLoop();}); hidThread=std::thread([this]{hidLoop();}); }
+Engine::Engine() { runtimeThread=std::thread([this]{runtimeLoop();}); hidThread=std::thread([this]{hidLoop();}); }
 Engine::~Engine() { stop(); quitting=true; if(runtimeThread.joinable())runtimeThread.join();if(hidThread.joinable())hidThread.join(); }
 void Engine::log(const QString& text) { std::lock_guard lock(mutex); logs<<text; while(logs.size()>1000) logs.removeFirst(); }
 void Engine::apply(Bundle bundle) { std::lock_guard lock(mutex); if(pending)bundle.reloadIds.unite(pending->reloadIds); pending=std::make_unique<Bundle>(std::move(bundle)); }

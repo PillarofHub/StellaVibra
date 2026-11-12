@@ -86,8 +86,21 @@ void Window::setChannelsDialog() {
 void Window::aboutDialog() {
     QDialog dialog(this);dialog.setWindowTitle("About Stella Vibra");dialog.resize(780,560);QVBoxLayout layout(&dialog);QLabel title("Stella Vibra "+QCoreApplication::applicationVersion()+" — Lua haptic effects for flight simulators");layout.addWidget(&title);QTabWidget tabs;layout.addWidget(&tabs);
     const auto root=appRoot();
-        auto* notices=new QPlainTextEdit;notices->setReadOnly(true);notices->setPlainText("Stella Vibra: MIT.\n\nQt 6.8.3: dynamically linked under LGPL-3.0. You may replace or modify Qt DLLs and debug/reverse-engineer for that purpose. Corresponding source is in sources/. Full notices and licenses are in licenses/.\n\nLua 5.4.8: MIT, Copyright 1994-2025 Lua.org, PUC-Rio.\n\nAurora Vibra reference: MIT, Copyright 2025 Rodrigo Troncoso; 2026 chegevarko1982. Device protocols and effect conditions informed this implementation; its waveform mixer is not used.\n\nMicrosoft Visual C++ runtime and SimConnect remain subject to Microsoft terms. The official SimConnect client is staged for local use; public redistribution rights have not been confirmed. See docs/SIMCONNECT-LICENSING.md and licenses/MSFS SDK EULA.pdf.");tabs.addTab(notices,"Notices");
+        auto* notices=new QPlainTextEdit;notices->setReadOnly(true);notices->setPlainText("Stella Vibra: MIT.\n\nQt 6.8.3: dynamically linked under LGPL-3.0. You may replace or modify Qt DLLs and debug/reverse-engineer for that purpose. Corresponding source is in sources/. Full notices and licenses are in licenses/.\n\nLua 5.4.8: MIT, Copyright 1994-2025 Lua.org, PUC-Rio.\n\nAurora Vibra reference: MIT, Copyright 2025 Rodrigo Troncoso; 2026 chegevarko1982. Device protocols and effect conditions informed this implementation; its waveform mixer is not used.\n\nMicrosoft Visual C++ runtime and SimConnect remain subject to Microsoft terms. The official SimConnect client is staged for local use; public redistribution rights have not been confirmed. See docs/THIRD-PARTY-NOTICES.md and licenses/MSFS SDK EULA.pdf.");tabs.addTab(notices,"Notices");
     for(const auto& pair:QList<QPair<QString,QString>>{{"MIT License","LICENSE"},{"Qt LGPL","licenses/LGPL-3.0.txt"},{"Aurora MIT","licenses/Aurora-MIT.txt"}}){auto* text=new QPlainTextEdit;text->setReadOnly(true);QFile file(root+"/"+pair.second);text->setPlainText(file.open(QIODevice::ReadOnly)?QString::fromUtf8(file.readAll()):"License file missing: "+pair.second);tabs.addTab(text,pair.first);}
     QDialogButtonBox buttons(QDialogButtonBox::Close);layout.addWidget(&buttons);connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);dialog.exec();
+}
+void Window::showDocumentation(const QString& relative,const QString& title) {
+    const auto path=appRoot()+"/"+relative;QFile file(path);
+    require(file.open(QIODevice::ReadOnly),"Documentation is missing or unreadable: "+path);file.close();
+    auto* dialog=new QDialog(this);dialog->setAttribute(Qt::WA_DeleteOnClose);dialog->setWindowTitle(title);dialog->resize(940,720);
+    auto* layout=new QVBoxLayout(dialog);auto* navigation=new QHBoxLayout;
+    auto* back=new QPushButton("Back");auto* forward=new QPushButton("Forward");auto* home=new QPushButton("Home");
+    navigation->addWidget(back);navigation->addWidget(forward);navigation->addWidget(home);navigation->addStretch();layout->addLayout(navigation);
+    auto* browser=new QTextBrowser;browser->setOpenExternalLinks(true);layout->addWidget(browser);
+    connect(back,&QPushButton::clicked,browser,&QTextBrowser::backward);connect(forward,&QPushButton::clicked,browser,&QTextBrowser::forward);connect(home,&QPushButton::clicked,browser,&QTextBrowser::home);
+    connect(browser,&QTextBrowser::backwardAvailable,back,&QPushButton::setEnabled);connect(browser,&QTextBrowser::forwardAvailable,forward,&QPushButton::setEnabled);back->setEnabled(false);forward->setEnabled(false);
+    browser->setSource(QUrl::fromLocalFile(path),QTextDocument::MarkdownResource);
+    auto* buttons=new QDialogButtonBox(QDialogButtonBox::Close);layout->addWidget(buttons);connect(buttons,&QDialogButtonBox::rejected,dialog,&QDialog::close);dialog->show();
 }
 }

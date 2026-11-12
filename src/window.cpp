@@ -116,7 +116,11 @@ Window::Window() {
     view->addSeparator();auto* resetView=view->addAction("Reset Default Layout");connect(resetView,&QAction::triggered,this,[this,left,effectDock,right,bottom,telemetryDock,applyDefaultSizes]{restoreState(defaultLayout);for(auto* dock:{left,effectDock,right,bottom,telemetryDock}){dock->setFloating(false);dock->show();}applyDefaultSizes();QTimer::singleShot(0,this,[this,applyDefaultSizes]{applyDefaultSizes();saveLocal();});});
     auto* settingsMenu=menuBar()->addMenu("Settings");connect(settingsMenu->addAction("Set Timings..."),&QAction::triggered,this,[this]{guarded([this]{setTimingsDialog();});});
     connect(settingsMenu->addAction("Set Channels..."),&QAction::triggered,this,[this]{guarded([this]{setChannelsDialog();});});
-    auto* help=menuBar()->addMenu("Help");connect(help->addAction("About..."),&QAction::triggered,this,[this]{aboutDialog();});
+    auto* help=menuBar()->addMenu("Help");
+    connect(help->addAction("README"),&QAction::triggered,this,[this]{guarded([this]{showDocumentation("README.md","Stella Vibra — README");});});
+    auto* manual=help->addAction("User Manual");manual->setShortcut(QKeySequence::HelpContents);
+    connect(manual,&QAction::triggered,this,[this]{guarded([this]{showDocumentation("docs/MANUAL.md","Stella Vibra — User Manual");});});
+    help->addSeparator();connect(help->addAction("About..."),&QAction::triggered,this,[this]{aboutDialog();});
     applyDefaultSizes();defaultLayout=saveState();
     state=new QLabel("MSFS: Discovering | HID: Discovering");state->setMinimumWidth(0);state->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);statusBar()->addWidget(state,1);
     restoreGeometry(QByteArray::fromBase64(local["geometry"].toString().toLatin1()));
@@ -127,7 +131,7 @@ Window::Window() {
         restoreState(QByteArray::fromBase64(local["layout"].toString().toLatin1()));
     else QTimer::singleShot(0,this,applyDefaultSizes);
     captureLayoutTimer.start();
-    connect(&timer,&QTimer::timeout,this,[this]{tick();});timer.start(20);addLog("Automatic MSFS and supported HID discovery enabled. Use Stop All to pause output.");QTimer::singleShot(0,this,[this]{if(QCoreApplication::arguments().contains("--ui-check"))return;auto path=local["last_project"].toString();if(!path.isEmpty() && QFileInfo::exists(path)) {try{loadProject(path);}catch(const std::exception& e){addLog(QString("Last project could not be opened: ")+e.what());closeProject();}}});
+    connect(&timer,&QTimer::timeout,this,[this]{tick();});timer.start(20);addLog("Automatic MSFS and supported HID discovery enabled. Use Stop All to pause output.");QTimer::singleShot(0,this,[this]{auto path=local["last_project"].toString();if(!path.isEmpty() && QFileInfo::exists(path)) {try{loadProject(path);}catch(const std::exception& e){addLog(QString("Last project could not be opened: ")+e.what());closeProject();}}});
 }
 Window::~Window(){engine.stop();}
 QSize Window::dockSpace() const {
@@ -263,7 +267,7 @@ void Window::tick(){if(nowMs()>=nextFileScan){nextFileScan=nowMs()+1000;try{sync
         if(m.id==selected){monitor->setCurrentCell(i,0);monitor->selectRow(i);}
     }
 }
-void Window::saveLocal(){if(QCoreApplication::arguments().contains("--ui-check"))return;local["layout_version"]=4;local["tick_ms"]=engine.tickMs();local["maximum_update_period_ms"]=engine.maximumUpdatePeriodMs();local.remove("simconnect_dll");local["version"]=1;local["geometry"]=QString::fromLatin1(saveGeometry().toBase64());local["layout"]=QString::fromLatin1(saveState().toBase64());writeJson(localPath(),local);}
+void Window::saveLocal(){local["layout_version"]=4;local["tick_ms"]=engine.tickMs();local["maximum_update_period_ms"]=engine.maximumUpdatePeriodMs();local.remove("simconnect_dll");local["version"]=1;local["geometry"]=QString::fromLatin1(saveGeometry().toBase64());local["layout"]=QString::fromLatin1(saveState().toBase64());writeJson(localPath(),local);}
 void Window::mapping(){int row=monitor->currentRow();require(row>=0,"Select a motor");auto id=monitor->item(row,0)->data(Qt::UserRole).toString();QStringList current;for(auto v:local["motors"].toObject()[id].toObject()["slots"].toArray())current<<v.toString();bool accepted=false;auto chosen=chooseSlots(this,current,"Motor Mapping",&accepted);if(!accepted)return;engine.mapMotor(id,chosen);tick();saveLocal();}
 void Window::motorTest(){int row=monitor->currentRow();require(row>=0,"Select a motor");auto id=monitor->item(row,0)->data(Qt::UserRole).toString();QDialog dialog(this);dialog.setWindowTitle("Motor Test — "+monitor->item(row,0)->text());QFormLayout layout(&dialog);QSpinBox strength,on,period,duration;strength.setRange(0,255);strength.setValue(1);on.setRange(0,5000);on.setValue(20);period.setRange(20,5000);period.setValue(80);duration.setRange(1,5000);duration.setValue(3000);QCheckBox pwm("PWM");QLabel effective;layout.addRow("Strength",&strength);layout.addRow(&pwm);layout.addRow("ON ms",&on);layout.addRow("Period ms",&period);layout.addRow("Duration ms (max 5000)",&duration);layout.addRow(&effective);auto update=[&]{effective.setText(QString("Effective PWM: %1 / %2 ms").arg(int(std::floor(double(on.value())/engine.tickMs()+0.5))*engine.tickMs()).arg(int(std::floor(double(period.value())/engine.tickMs()+0.5))*engine.tickMs()));};connect(&on,&QSpinBox::valueChanged,&dialog,update);connect(&period,&QSpinBox::valueChanged,&dialog,update);update();QPushButton start("Start"),stop("Stop");layout.addRow(&start,&stop);connect(&start,&QPushButton::clicked,&dialog,[&]{guarded([&]{engine.test(id,pwm.isChecked()?Mode::Pwm:Mode::Constant,strength.value(),on.value(),period.value(),duration.value());});});connect(&stop,&QPushButton::clicked,&dialog,[this]{engine.stopTest();});dialog.exec();engine.stopTest();}
 }

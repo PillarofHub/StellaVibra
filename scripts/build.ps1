@@ -34,7 +34,6 @@ foreach ($destination in $destinations) {
     Copy-Item "$root\licenses" $destination -Recurse -Force
     New-Item -ItemType Directory -Force "$destination\sources" | Out-Null
     Copy-Item "$root\.deps\qtbase-everywhere-src-6.8.3.tar.xz","$root\.deps\lua-5.4.8.tar.gz" "$destination\sources" -Force
-    Copy-Item "$root\README.md" $destination -Force
     Set-Content -LiteralPath "$destination/bin/qt.conf" -Value "[Paths]`nPlugins=plugins" -Encoding ascii
     # Local runnable staging includes the SDK client. Public redistribution rights remain unresolved.
     $localClient = "$root\.deps\msfs2024\client\SimConnect.dll"
@@ -49,8 +48,8 @@ foreach ($destination in $destinations) {
     # Remove only relocated generated files, after their replacements exist.
     # Unknown files and StellaVibra.pref are deliberately retained.
     $relocated=@{
-        'CONTRACTS.md'='docs/CONTRACTS.md';'THIRD-PARTY-NOTICES.md'='docs/THIRD-PARTY-NOTICES.md';
-        'SIMCONNECT-LICENSING.md'='docs/SIMCONNECT-LICENSING.md';'StellaVibra.pdb'='bin/StellaVibra.pdb';
+        'THIRD-PARTY-NOTICES.md'='docs/THIRD-PARTY-NOTICES.md';
+        'StellaVibra.pdb'='bin/StellaVibra.pdb';
         'SimConnect.dll'='bin/simconnect/MSFS2024/SimConnect.dll';'SimConnect-provenance.json'='bin/simconnect/MSFS2024/provenance.json'
     }
     foreach($dll in Get-ChildItem -LiteralPath "$destination/bin" -Filter '*.dll' -File){$relocated[$dll.Name]="bin/$($dll.Name)"}
@@ -63,6 +62,10 @@ foreach ($destination in $destinations) {
         if((Test-Path -LiteralPath $replacement -PathType Leaf) -and (Test-Path -LiteralPath $old -PathType Leaf)){
             try { Remove-Item -LiteralPath $old -Force } catch { throw "Cannot remove relocated file ${old}: $($_.Exception.Message)" }
         }
+    }
+    # Retired internal documents from earlier local staging; never ship as user help.
+    foreach($relative in @('docs/CONTRACTS.md','docs/SIMCONNECT-LICENSING.md','CONTRACTS.md','SIMCONNECT-LICENSING.md')){
+        $old=Join-Path $destination $relative;if(Test-Path -LiteralPath $old -PathType Leaf){Remove-Item -LiteralPath $old -Force}
     }
     # Remove only empty legacy plugin directories (never recurse-delete content).
     foreach($relative in @('platforms','styles','imageformats','iconengines','networkinformation','tls','generic','simconnect/MSFS2020','simconnect')){
