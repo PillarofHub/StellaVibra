@@ -317,3 +317,7 @@ scripts/package.ps1은 build.ps1 -Deploy 이후 실행한다. 배포 대상 파�
 사용자 오류를 확인: BOM 없는 UTF-8 스크립트의 한글 정규식이 Windows PowerShell에서 손상되어 catch 자체가 실패했다. 오류 필터를 ASCII Unicode escape로 변경했다. 가려진 원인은 windeployqt의 번역 경고(stderr)를 ErrorActionPreference Stop이 종료 오류로 취급한 것이다. 해당 호출에서만 Continue로 경고를 기록하고 종료 코드로 실패를 판정하도록 변경했다. build/package의 .NET Framework 미지원 Path.GetRelativePath를 이미 열거된 하위 파일의 접두 경로 제거로 대체했다.
 
 검증: Windows PowerShell 5.1 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Deploy exit0, package.ps1 exit0. 새 패키지 dist/packages/a160a487faa140a883624d8b95664c09/StellaVibra-0.2.0-windows-x64.zip, 124파일. SHA256 6402d5568dbe5a4c75918bd96252719f022459d919f9c7ddb3237010e643b585. diff --check 통과. 앱/게임/HID/테스트 실행 없음. 이번 수정 커밋·푸시 미수행; 릴리스 태그 생성 전 수정 커밋을 포함해야 한다.
+
+## 2026-11-13 — 호환 수정 푸시 및 최종 패키지 생성
+
+사용자 요청으로 e7aa389(PowerShell 5.1 호환 수정)을 origin/main에 푸시 완료. Windows PowerShell에서 build.ps1 -Deploy 및 package.ps1 모두 exit0. 업로드할 최신 ZIP/SHA-256은 dist/packages/eb9ada04180e4cbda6ce74bf8a9e1ecd/에 있다. ZIP SHA256 ed05bb0b7ea7be8e6a00a29dfe50e863d46d0abd8cea2b45c0a207d8e7023aeb, 124파일. 생성된 체크섬 파일과 ZIP 해시 일치 확인. 실행 테스트·태그·Release 생성·바이너리 업로드는 하지 않았다. 이 기록 후속 커밋은 문서만 변경하며 패키지의 코드 기준은 e7aa389과 동일하다.
