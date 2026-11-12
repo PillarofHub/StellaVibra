@@ -311,3 +311,9 @@ scripts/package.ps1은 build.ps1 -Deploy 이후 실행한다. 배포 대상 파�
 사용자가 https://github.com/PillarofHub/StellaVibra.git 로 현재 작업 커밋 및 푸시를 명시적으로 요청했다. 이전 푸시 금지 기본 규칙의 이번 작업 예외다. 미커밋 SimConnect 동봉 고지·패키징 스크립트·공개 절차를 선택 커밋한다. 원격 main의 초기 MIT LICENSE 커밋은 강제 덮어쓰기 없이 병합하고 PillarofCode 및 Stella Vibra contributors 저작권 표기를 함께 보존한다. 태그/Target/Release 설정과 바이너리 업로드는 후속 작업이다. 이전 빌드·패키지 검증 결과를 유지하며 이번에는 diff와 Git 이력을 확인한다. 라이선스 고지가 변경되므로 공개 바이너리는 다음 릴리스 단계에서 build.ps1 -Deploy 및 package.ps1로 재생성해야 한다.
 
 푸시 결과: 로컬 변경 커밋2cec489 및 원격 초기 이력 병합8a2009a 완료. main 푸시는 GitHub403으로 거절되었다: 현재 HTTPS 인증 계정 honey-yi-papaya에 PillarofHub/StellaVibra 쓰기 권한이 없다. 원격 main은 ed3f110 그대로이며 태그/릴리스도 생성하지 않았다. 저장소 쓰기 권한 계정으로 Git 인증을 변경하거나 해당 계정에 권한을 부여한 뒤 main 푸시를 재시도해야 한다. 비밀번호/토큰을 대화에 보내지 않는다.
+
+## 2026-11-13 — Windows PowerShell 5.1 빌드/패키징 호환 수정
+
+사용자 오류를 확인: BOM 없는 UTF-8 스크립트의 한글 정규식이 Windows PowerShell에서 손상되어 catch 자체가 실패했다. 오류 필터를 ASCII Unicode escape로 변경했다. 가려진 원인은 windeployqt의 번역 경고(stderr)를 ErrorActionPreference Stop이 종료 오류로 취급한 것이다. 해당 호출에서만 Continue로 경고를 기록하고 종료 코드로 실패를 판정하도록 변경했다. build/package의 .NET Framework 미지원 Path.GetRelativePath를 이미 열거된 하위 파일의 접두 경로 제거로 대체했다.
+
+검증: Windows PowerShell 5.1 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Deploy exit0, package.ps1 exit0. 새 패키지 dist/packages/a160a487faa140a883624d8b95664c09/StellaVibra-0.2.0-windows-x64.zip, 124파일. SHA256 6402d5568dbe5a4c75918bd96252719f022459d919f9c7ddb3237010e643b585. diff --check 통과. 앱/게임/HID/테스트 실행 없음. 이번 수정 커밋·푸시 미수행; 릴리스 태그 생성 전 수정 커밋을 포함해야 한다.

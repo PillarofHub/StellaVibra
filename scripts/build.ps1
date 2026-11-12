@@ -26,8 +26,12 @@ foreach ($destination in $destinations) {
     New-Item -ItemType Directory -Force "$destination/bin/simconnect/MSFS2020" | Out-Null
     Copy-Item $client2020,"$root/.deps/msfs2020/client/provenance.json","$root/.deps/msfs2020/client/MSFS SDK EULA.pdf" "$destination/bin/simconnect/MSFS2020" -Force
     $qtDeployTool = "$root\.deps\bin\windeployqt.exe"
+    # Windows PowerShell treats native stderr warnings as errors under Stop.
+    $ErrorActionPreference = 'Continue'
     & $qtDeployTool --plugindir "$destination\bin\plugins" --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime "$destination\bin\StellaVibra.exe"
-    if ($LASTEXITCODE) { throw 'Qt deployment failed' }
+    $qtExitCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($qtExitCode) { throw 'Qt deployment failed' }
     $redist = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'x64') } | Sort-Object Name -Descending | Select-Object -First 1
     if (-not $redist) { throw 'MSVC app-local runtime not found' }
     Copy-Item "$($redist.FullName)\x64\Microsoft.VC*.CRT\*.dll" "$destination/bin" -Force
@@ -54,7 +58,7 @@ foreach ($destination in $destinations) {
     }
     foreach($dll in Get-ChildItem -LiteralPath "$destination/bin" -Filter '*.dll' -File){$relocated[$dll.Name]="bin/$($dll.Name)"}
     foreach($file in Get-ChildItem -LiteralPath "$destination/bin/plugins" -Recurse -File){
-        $relative=[IO.Path]::GetRelativePath("$destination/bin/plugins",$file.FullName);$relocated[$relative]="bin/plugins/$relative"
+        $relative=$file.FullName.Substring(([IO.Path]::GetFullPath("$destination/bin/plugins").TrimEnd('\','/' )).Length + 1);$relocated[$relative]="bin/plugins/$relative"
     }
     foreach($name in @('SimConnect.dll','provenance.json','MSFS SDK EULA.pdf')){$relocated["simconnect/MSFS2020/$name"]="bin/simconnect/MSFS2020/$name"}
     foreach($relative in $relocated.Keys){
@@ -86,7 +90,7 @@ try {
     $failure = $_.Exception.Message
     $location = $_.InvocationInfo.PositionMessage
     if (-not $Detailed -and (Test-Path $log)) {
-        $errors = @(Select-String -Path $log -Pattern '(?i)error|fatal|failed|오류' | Select-Object -Last 12 | ForEach-Object { $_.Line })
+        $errors = @(Select-String -Path $log -Pattern '(?i)error|fatal|failed|\uC624\uB958' | Select-Object -Last 12 | ForEach-Object { $_.Line })
         if ($errors.Count) { $errors | Write-Host }
         else { Get-Content $log -Tail 12 | Write-Host }
     }

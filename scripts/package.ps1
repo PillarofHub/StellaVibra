@@ -10,7 +10,7 @@ foreach ($exe in @('StellaVibra.exe','bin/StellaVibra.exe')) {
 $files = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($p in @('StellaVibra.exe','LICENSE','README.md','assets/stella-vibra-logo.png','docs/MANUAL.md','docs/RELEASE-NOTES-0.2.0.md','docs/THIRD-PARTY-NOTICES.md','bin/StellaVibra.exe','bin/StellaVibra.pdb','bin/qt.conf','sources/qtbase-everywhere-src-6.8.3.tar.xz','sources/lua-5.4.8.tar.gz')) { [void]$files.Add($p) }
 foreach ($file in Get-ChildItem -LiteralPath "$source/bin" -File -Filter '*.dll') { [void]$files.Add("bin/$($file.Name)") }
-foreach ($file in Get-ChildItem -LiteralPath "$source/bin/plugins" -Recurse -File -Filter '*.dll') { [void]$files.Add([IO.Path]::GetRelativePath($source,$file.FullName)) }
+foreach ($file in Get-ChildItem -LiteralPath "$source/bin/plugins" -Recurse -File -Filter '*.dll') { [void]$files.Add($file.FullName.Substring($source.TrimEnd('\','/').Length + 1)) }
 foreach ($game in @('MSFS2020','MSFS2024')) {
     foreach ($name in @('SimConnect.dll','provenance.json')) { [void]$files.Add("bin/simconnect/$game/$name") }
 }
@@ -18,7 +18,7 @@ foreach ($game in @('MSFS2020','MSFS2024')) {
 [void]$files.Add('licenses/MSFS SDK EULA.pdf')
 # Use the repository's template/license list, not arbitrary files added by users.
 foreach ($dir in @('effects','licenses')) {
-    foreach ($file in Get-ChildItem -LiteralPath "$root/$dir" -Recurse -File) { [void]$files.Add([IO.Path]::GetRelativePath($root,$file.FullName)) }
+    foreach ($file in Get-ChildItem -LiteralPath "$root/$dir" -Recurse -File) { [void]$files.Add($file.FullName.Substring($root.TrimEnd('\','/').Length + 1)) }
 }
 foreach ($relative in $files) {
     if (!(Test-Path -LiteralPath "$source/$relative" -PathType Leaf)) { throw "Missing deployed file: $relative" }
