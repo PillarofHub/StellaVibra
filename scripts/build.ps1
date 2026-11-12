@@ -35,7 +35,7 @@ foreach ($destination in $destinations) {
     New-Item -ItemType Directory -Force "$destination\sources" | Out-Null
     Copy-Item "$root\.deps\qtbase-everywhere-src-6.8.3.tar.xz","$root\.deps\lua-5.4.8.tar.gz" "$destination\sources" -Force
     Set-Content -LiteralPath "$destination/bin/qt.conf" -Value "[Paths]`nPlugins=plugins" -Encoding ascii
-    # Local runnable staging includes the SDK client. Public redistribution rights remain unresolved.
+    # Include original SDK clients under the maintainer distribution policy; retain provenance and EULAs.
     $localClient = "$root\.deps\msfs2024\client\SimConnect.dll"
     if (-not (Test-Path $localClient)) { throw 'Official SDK client missing: .deps/msfs2024/client/SimConnect.dll (see SIMCONNECT-LICENSING.md)' }
     if (Test-Path $localClient) {

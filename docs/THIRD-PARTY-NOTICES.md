@@ -28,9 +28,9 @@ Microsoft license terms apply. The prepared package includes app-local runtime D
 
 ## Microsoft SimConnect
 
-Microsoft-owned SDK components; not covered by Stella Vibra's MIT license. Local development packages contain unmodified clients extracted from MSFS 2024 SDK Core 1.7.3 and MSFS 2020 SDK Core 0.24.6.0. They are kept separately under `bin/simconnect/MSFS2024/` and `bin/simconnect/MSFS2020/`. Each directory includes provenance.json; SDK EULA copies accompany the package.
+All rights in the SimConnect SDK client DLLs remain with Microsoft Corporation and its licensors. These components are not covered by Stella Vibra's MIT license; Microsoft's applicable license terms govern their use. Windows packages contain unmodified clients extracted from MSFS 2024 SDK Core 1.7.3 and MSFS 2020 SDK Core 0.24.6.0. They are kept separately under `bin/simconnect/MSFS2024/` and `bin/simconnect/MSFS2020/`. Each directory includes provenance.json; SDK EULA copies accompany the package.
 
-**Public redistribution rights for these client DLLs have not been confirmed.** A successful download or local build is not evidence of redistribution permission. No public binary publication has been performed. Keep this distinction when preparing a release and obtain the necessary confirmation before distributing an SDK-containing package.
+The maintainer has chosen to include these unmodified clients with Stella Vibra. Explicit confirmation of redistribution permission has not been obtained; this inclusion and ownership notice do not constitute a grant of rights from Microsoft. Stella Vibra is not endorsed or supported by Microsoft. If Microsoft raises an objection, the maintainer intends to withdraw affected downloads and review the packaging. Withdrawal does not revoke copies already downloaded or resolve any prior distribution obligations.
 
 [MSFS 2024 SDK EULA](https://docs.flightsimulator.com/msfs2024/retail/introduction/sdk-eula/)
 

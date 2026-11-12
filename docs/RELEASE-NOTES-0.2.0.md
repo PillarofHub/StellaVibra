@@ -8,7 +8,7 @@ Milestone date: November 12, 2026.
 
 0.2.0 freezes the current feature set for acceptance testing. Version 0.2.0 is used in CMake, About, and both Windows executables. Project and preferences JSON schema version 1 remains unchanged.
 
-This is a prepared local release milestone, not a statement that public binaries have been published. No GitHub upload has been performed. Public distribution of the bundled SimConnect clients remains unresolved; the current SDK-containing package must not be represented as cleared for public redistribution. The application code's MIT license does not grant rights to Microsoft DLLs.
+The Windows package includes unmodified SimConnect clients by the maintainer's decision, with Microsoft ownership, SDK EULAs and provenance preserved. This decision is not confirmation of Microsoft redistribution permission. The application code's MIT license does not grant rights to Microsoft DLLs. See the third-party notices for details. Preparing this package does not publish it to GitHub.
 
 ## Included in this milestone
 
@@ -55,6 +55,6 @@ Temporary --ui-check startup/layout diagnostics have been removed. This version 
 5. On each target game, verify start/stop/reconnect, pause, aircraft change and stale-input shutdown. Start with Stop All and low strengths, then explicitly resume.
 6. Verify supported-device hotplug, mappings, per-motor tests, Stop All and conflicting-effect priority. Confirm the revised default effects in flight.
 7. Confirm logs, troubleshooting information and writable-folder behavior. Preserve matching PDBs for reports.
-8. Resolve third-party distribution conditions, especially SimConnect, before publishing SDK-containing binaries. Exclude private pref files, diagnostics, user projects and local build caches from any published package.
+8. Verify the bundled third-party notices, original SDK EULAs and provenance, and record the maintainer's SimConnect distribution decision. Exclude private pref files, diagnostics, user projects and local build caches from any published package.
 
 No automatic GitHub publishing or external telemetry upload is part of 0.2.0.

@@ -20,6 +20,8 @@ Help → README/User Manual은 배포 루트의 파일을 QTextBrowser에서 열
 ## 공개 릴리스 전 남은 작업
 
 - docs/RELEASE-NOTES-0.2.0.md의 수동 인수 항목을 실제 GUI·게임·장치에서 확인하고 결과를 기록한다. 기존 MSFS2024 이착륙 성공과 최종 패키지 전체 검증을 구분한다.
-- Microsoft SimConnect 배포 권리를 확인한다. 현재 로컬 dist를 곧바로 공개 배포 가능하다고 표현하지 않는다.
+- 사용자 결정에 따라 원본 SimConnect DLL을 동봉한다. Microsoft 소유권·EULA·출처를 유지하고 명시적 재배포 허가 미확인은 고지에 남긴다. 이의 제기 시 해당 다운로드를 철회하고 패키징을 재검토한다. 철회가 기존 배포 책임을 소급 제거하지는 않는다.
 - 공개 패키지는 별도 깨끗한 staging에서 만들고 pref/diagnostics/사용자 프로젝트를 제외한다. 기존 사용자 실행 폴더에서 설정을 삭제하거나 통째로 압축하지 않는다.
-- 소스/바이너리 공개 여부·대상 GitHub 저장소·릴리스 업로드는 후속 지시에 따른다. 이번에는 로컬 커밋까지 수행한다.
+- 소스/바이너리 공개 여부·대상 GitHub 저장소·릴리스 업로드는 후속 지시에 따른다. 커밋·푸시는 각 작업의 명시적 요청을 따른다.
+
+패키징: build.ps1 -Deploy 후 scripts/package.ps1로 별도 dist/packages/<고유ID>에 ZIP/SHA-256을 만든다. 사용자 설정·진단·프로젝트를 제외하며 기존 실행 폴더를 삭제하지 않는다. GitHub 절차는 docs/PUBLISHING.md 참조.

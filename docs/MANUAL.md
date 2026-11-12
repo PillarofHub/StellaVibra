@@ -4,7 +4,7 @@
 
 ## Installation and first launch
 
-Use a complete portable folder in a location where you can write files. Run the root `StellaVibra.exe`; it launches the application in `bin/`. Do not move the executable by itself. Qt and Microsoft runtime DLLs are supplied in the prepared local package. The current package's SimConnect public redistribution status is explained in the release notes.
+Use a complete portable folder in a location where you can write files. Run the root `StellaVibra.exe`; it launches the application in `bin/`. Do not move the executable by itself. Qt and Microsoft runtime DLLs are supplied in the Windows package alongside the version-specific SimConnect clients. See the third-party notices for Microsoft ownership and applicable terms.
 
 The app restores its window layout and last project from `StellaVibra.pref`. If the project is missing, it starts without a project. There is no game connection until a project selects a target game. Supported HID devices are discovered in the background.
 

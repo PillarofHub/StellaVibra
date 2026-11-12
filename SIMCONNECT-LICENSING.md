@@ -9,7 +9,7 @@
 - [Asobo의 2026-10-28 답변](https://devsupport.flightsimulator.com/t/is-the-unmodified-simconnect-dll-distributable-code-for-a-commercial-external-add-on/18701/17)은 이 질의를 Microsoft에 전달했으나 답변이 없다고 설명한다. 2026-11-08 마지막 게시물(#24)까지 확인했으며 이후 게시물에도 명시적 허가 답변은 없었다. 커뮤니티의 실제 배포 사례나 빌드 시 DLL 복사 설정은 참고가 되지만 권한 있는 배포 허가의 대체 근거로 사용하지 않는다.
 - [Asobo의 기술 답변](https://devsupport.flightsimulator.com/t/simconnect-dll-is-now-simconnect-internal-dll-in-msfs-2024/13559/2)에 따르면 게임의 SimConnect_internal.dll은 SDK 클라이언트 DLL과 같은 프로세스 내 클라이언트 버전 처리 방식이 다르다. 게임 설치 경로를 찾는 것만으로 정식 SDK 클라이언트 확보 절차를 대체한다고 보장할 수 없다. 파일 이름 변경·WindowsApps 권한 변경·게임 내부 DLL 복사는 구현하지 않는다.
 
-## 이번 구현의 선택
+## 초기 구현의 선택 (이력)
 
 로컬 개발용 Release에는 공식 SDK에서 추출한 원본 DLL을 둘 수 있도록 한다. 이 로컬 개발 복사는 공개 재배포 권리 확인과 구분한다. Aurora의 DLL은 원 SDK 버전이 없고 SHA-256이 `cae445bddaf35c6f75f01ed415cf708c61fc3a0cbc2412f577f768d82f143b30`인 별도 바이너리이므로 공식 2024 파일이라고 표시하지 않는다.
 
@@ -17,12 +17,16 @@
 
 현재 build/Release와 dist/StellaVibra는 모두 로컬 실행 검증용 준비 폴더로, 공식 SDK DLL·출처·EULA를 포함한다. 공개 업로드나 배포는 수행하지 않았다. 이 파일 배치 변경은 아래의 공개 재배포 권리 미확인 결론을 변경하지 않는다. 프로젝트 MIT 고지는 Microsoft DLL에 적용되지 않는다.
 
-## 공개 배포 전 해결 방법
+## 현재 배포 방침 (2026-11-12 사용자 결정)
 
-1. 정확한 SDK 버전·DLL 크기·SHA-256·원본 URL을 유지한다. 원본 DLL과 고지를 수정하지 않는다.
-2. Microsoft/Asobo에 이 파일이 SDK EULA의 distributable code인지, 외부 무료/유료 앱에 동봉 가능한지, 필수 고지와 업데이트 의무가 무엇인지 서면 확인한다. MSI 또는 EXE에 내장하는 방식도 별도로 확인한다. 이 작업에서는 문의를 전송하지 않았다.
-3. 허가가 확인되면 그 조건에 맞춰 동봉 배포한다. 확인 전 현재 준비 폴더를 공개 배포하지 않는다. DLL을 제외한 배포가 필요하면 정식 클라이언트 확보·버전별 bin/simconnect 폴더 설치 절차를 별도로 마련해야 한다. 일반 최종 사용자가 개발 목적 없이 SDK를 사용하는 조건까지 확정했다고 표현하지 않는다.
-4. 공식 다운로드를 앱이 대신 실행하거나 사용자가 게임 내부 DLL을 직접 선택하게 하는 방식도 라이선스 문제를 자동으로 해결하지 않는다. 정식 클라이언트 위치와 사용 조건을 명확히 하는 것이 우선이다.
+사용자는 별도 허가 회신을 기다리지 않고 원본 SimConnect SDK 클라이언트를 Windows 패키지에 포함하기로 결정했다. 이전의 “확인 전 공개 배포하지 않음” 운영 방침은 이 결정으로 대체한다. 이는 Microsoft가 허가했다는 판단이나 법률적 보장이 아니다. 공식 EULA의 distributable code 예외는 존재하지만 해당 DLL의 적용 여부에 대한 명시적 확인은 여전히 확보하지 못했다. 소유권 표기와 다운로드 철회만으로 위험이 없어지거나 이전 배포 책임이 해소된다고 보지 않는다.
+
+- 2024/2020 원본 DLL·SHA-256·SDK 버전·출처 JSON·EULA를 유지한다. 게임 내부 DLL이나 Aurora의 바이너리를 대신 배포하지 않는다.
+- 사용자용 제3자 고지와 About에 Microsoft Corporation 및 라이선서의 권리, Stella MIT 적용 제외, Microsoft 비보증/비지원 관계를 표시한다. 제3자 고지에 명시적 허가 미확인과 유지관리자의 동봉 결정을 구분해 기록한다.
+- Microsoft의 이의 제기가 있으면 해당 Release 다운로드를 철회하고 DLL 제외/설치 방식 변경 등을 재검토한다. 이미 다운로드된 복사본은 회수되지 않으며 철회가 소급 허가가 되는 것은 아니다.
+- DLL·SDK 원본은 소스 Git에 넣지 않고 바이너리 Release asset에 포함한다. 이번 작업에서 GitHub 업로드나 문의 전송은 하지 않는다.
+
+공식 EULA 재확인: https://docs.flightsimulator.com/msfs2024/retail/introduction/sdk-eula/ (2026-11-12). 아래 확보 기록의 로컬 개발용 표기는 당시 확보 목적을 뜻한다. 현재 배포 정책은 이 절을 따른다.
 
 ## 확보한 원본
 

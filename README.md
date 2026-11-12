@@ -61,7 +61,7 @@ Settings live in `StellaVibra.pref` beside the root executable. No application p
 
 Stella Vibra's code is licensed under [MIT](LICENSE). Qt, Lua, referenced Aurora Vibra code, Microsoft runtimes, and SimConnect have their own notices and terms.
 
-**The prepared local package contains official SimConnect SDK client DLLs whose public redistribution rights have not been confirmed. Do not treat this local package as an approved public binary release.** GitHub publication and public binary distribution have not been performed. See the [release notes](docs/RELEASE-NOTES-0.2.0.md) and [third-party notices](docs/THIRD-PARTY-NOTICES.md).
+The Windows package includes unmodified Microsoft SimConnect SDK client DLLs for MSFS connectivity. These components remain the property of Microsoft Corporation and its licensors and are not covered by Stella Vibra's MIT license. Microsoft license terms and third-party notices accompany the package. Stella Vibra is not endorsed or supported by Microsoft. See the [third-party notices](docs/THIRD-PARTY-NOTICES.md) for the distribution policy and [release notes](docs/RELEASE-NOTES-0.2.0.md) for verification status.
 
 ## Troubleshooting and reporting
 

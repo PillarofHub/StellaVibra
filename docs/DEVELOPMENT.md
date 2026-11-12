@@ -386,3 +386,5 @@ Settings → Set Channels에서 Yoke/Stick/Throttle/Rudder의 채널 수를 각�
 ## 0.2.0 릴리스 정리 기준
 
 기능 동결과 사용자 문서는 ../README.md, MANUAL.md, RELEASE-NOTES-0.2.0.md를 따른다. 이 파일의 이전 README/중간 구현 설명은 개발 배경으로 보존한다. --ui-check는 제거되었으며 DCS 후 버전 고정이라는 이전 순서는 최신 사용자 요청으로 대체되었다. 내부 운영은 ../WORKFLOWS.md와 RELEASE-CHECKLIST.md를 따른다.
+
+현재 SimConnect 배포 방침은 사용자 결정(2026-11-12)에 따라 원본 DLL 동봉이다. Microsoft 권리/SDK EULA/출처와 명시적 허가 미확인을 구분해 고지한다. 이전 공개 배포 보류 문구는 ../SIMCONNECT-LICENSING.md의 최신 방침으로 대체한다. GitHub 공개 절차는 PUBLISHING.md를 따른다.

@@ -297,3 +297,15 @@ Help → README / User Manual(F1)에 비모달 오프라인 Markdown 뷰어를 �
 검증: .\scripts\build.ps1 -Deploy exit0. C++/RC 컴파일·링크 및41개 Lua 구문 컴파일 통과. 사용자 문서/이미지 상대경로18개 존재 확인, 소스와 Release/dist 문서·로고 해시 일치, 두 배포 폴더의 런처/앱/PDB 해시 일치, EXE 네 파일 ProductVersion0.2.0 확인. diff --check 통과. 앱 실행·테스트·게임·HID/모터 동작은 수행하지 않았다. Help 렌더링·페이지 이동·F1과 최종 패키지 실기 회귀 검증은 사용자 확인 항목이다. 실행 경로: build/Release/StellaVibra.exe 또는 dist/StellaVibra/StellaVibra.exe.
 
 공개 배포의 미해결 항목: 공식 SimConnect 클라이언트의 공개 재배포 권리는 아직 확인되지 않았다. 소스 MIT와 SDK DLL 권리는 별개이며, 현재 dist는 로컬 실행용 준비 폴더다. 공개 패키징 시 개인 pref/diagnostics/프로젝트를 제외해야 한다. 해당 내용을 영어 릴리스 노트·제3자 고지와 내부 체크리스트에 명시했다.
+
+## 2026-11-12 — SimConnect 동봉 배포 방침 및 GitHub 준비
+
+사용자 결정에 따라 명시적 허가 회신을 기다리는 운영 조건을 해제하고 원본 SimConnect 두 버전을 포함하는 Windows 패키지를 준비했다. README/매뉴얼/릴리스 노트/제3자 고지/About, SIMCONNECT-LICENSING 및 운영 문서를 일치시켰다. Microsoft Corporation 및 라이선서의 권리, Stella MIT 적용 제외, 비보증/비지원 관계를 표시하고 명시적 재배포 허가 미확인은 제3자 고지에 보존한다. 이의 제기 시 다운로드 철회/패키징 재검토 방침을 기록했다. 소유권 고지·철회가 허가나 소급 면책을 의미한다고 표현하지 않는다. 공식 SDK EULA와 GitHub Releases 공식 문서를 다시 확인했다.
+
+scripts/package.ps1은 build.ps1 -Deploy 이후 실행한다. 배포 대상 파일 목록만 새 dist/packages/<GUID>/StellaVibra에 복사하여 Windows ZIP 및 SHA-256 파일을 만든다. 원본 DLL 해시와 현재 문서/템플릿/라이선스의 배포 일치를 검사하고 두 SimConnect 클라이언트·EULA·provenance, Qt/Lua 대응 소스, 실행 파일/PDB, 도움말을 포함한다. 사용자 실행 폴더는 보존하며 pref/diagnostics/프로젝트는 압축하지 않는다. docs/PUBLISHING.md에 Git 소스와 Release asset 차이, Draft/Pre-release, 태그/Target, ZIP 업로드 및 철회 절차를 한국어로 작성했다.
+
+검증: build.ps1 -Deploy exit0, 컴파일·링크/Lua 구문 검사 통과. package.ps1 exit0. 산출물 dist/packages/234cd71cc6c140428ab509921b99eab7/StellaVibra-0.2.0-windows-x64.zip (67,438,361 bytes), SHA-256 08f67f1d57d3f2c4873f229e442488c05c408e38641accb804b28f6cfba54ff3. ZIP 내124개 파일의 해시와 staging 일치, 필수 DLL/EULA 포함, pref/log/dmp/diagnostics/sv/Git 파일 미포함 확인. diff --check 통과. 앱/게임/HID 실행 및 런타임 테스트 미수행. 커밋·태그·푸시·GitHub 업로드는 이번에 요청되지 않아 수행하지 않았다. 공개 전 이번 변경을 커밋하고 그 커밋과 패키지를 대응시켜야 한다.
+
+## 2026-11-13 — GitHub 최초 소스 푸시
+
+사용자가 https://github.com/PillarofHub/StellaVibra.git 로 현재 작업 커밋 및 푸시를 명시적으로 요청했다. 이전 푸시 금지 기본 규칙의 이번 작업 예외다. 미커밋 SimConnect 동봉 고지·패키징 스크립트·공개 절차를 선택 커밋한다. 원격 main의 초기 MIT LICENSE 커밋은 강제 덮어쓰기 없이 병합하고 PillarofCode 및 Stella Vibra contributors 저작권 표기를 함께 보존한다. 태그/Target/Release 설정과 바이너리 업로드는 후속 작업이다. 이전 빌드·패키지 검증 결과를 유지하며 이번에는 diff와 Git 이력을 확인한다. 라이선스 고지가 변경되므로 공개 바이너리는 다음 릴리스 단계에서 build.ps1 -Deploy 및 package.ps1로 재생성해야 한다.
