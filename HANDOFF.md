@@ -309,3 +309,5 @@ scripts/package.ps1은 build.ps1 -Deploy 이후 실행한다. 배포 대상 파�
 ## 2026-11-13 — GitHub 최초 소스 푸시
 
 사용자가 https://github.com/PillarofHub/StellaVibra.git 로 현재 작업 커밋 및 푸시를 명시적으로 요청했다. 이전 푸시 금지 기본 규칙의 이번 작업 예외다. 미커밋 SimConnect 동봉 고지·패키징 스크립트·공개 절차를 선택 커밋한다. 원격 main의 초기 MIT LICENSE 커밋은 강제 덮어쓰기 없이 병합하고 PillarofCode 및 Stella Vibra contributors 저작권 표기를 함께 보존한다. 태그/Target/Release 설정과 바이너리 업로드는 후속 작업이다. 이전 빌드·패키지 검증 결과를 유지하며 이번에는 diff와 Git 이력을 확인한다. 라이선스 고지가 변경되므로 공개 바이너리는 다음 릴리스 단계에서 build.ps1 -Deploy 및 package.ps1로 재생성해야 한다.
+
+푸시 결과: 로컬 변경 커밋2cec489 및 원격 초기 이력 병합8a2009a 완료. main 푸시는 GitHub403으로 거절되었다: 현재 HTTPS 인증 계정 honey-yi-papaya에 PillarofHub/StellaVibra 쓰기 권한이 없다. 원격 main은 ed3f110 그대로이며 태그/릴리스도 생성하지 않았다. 저장소 쓰기 권한 계정으로 Git 인증을 변경하거나 해당 계정에 권한을 부여한 뒤 main 푸시를 재시도해야 한다. 비밀번호/토큰을 대화에 보내지 않는다.
