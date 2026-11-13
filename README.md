@@ -8,7 +8,7 @@
 
 Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors. Edit effects, tune their parameters while flying, and route each effect to the motors you want.
 
-**Version 0.2.1** adds Explorer file management and New File path selection. This local build has no release tag or published release; GUI acceptance checks are pending. MSFS 2024 takeoff and landing vibration was confirmed by the project owner with an earlier build. Other game integrations have not been verified in live sessions.
+**Version 0.2.1** adds Explorer file management and New File path selection. This local build has no release tag or published release. The project owner confirmed Explorer name sorting; other GUI acceptance checks remain pending. MSFS 2024 takeoff and landing vibration was confirmed by the project owner with an earlier build. Other game integrations have not been verified in live sessions.
 
 [User manual](docs/MANUAL.md) · [0.2.0 release notes](docs/RELEASE-NOTES-0.2.0.md) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
 
@@ -30,8 +30,9 @@ Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors.
 | Microsoft Flight Simulator 2020 | Separate SimConnect client | 11 | Live verification pending |
 | X-Plane 12 | Local UDP RREF | 11 | Live verification pending |
 | War Thunder | Local HTTP telemetry | 8 | Live verification pending |
+| DCS | Local UDP exporter | None yet; telemetry and script setup only | Automatic profile discovery confirmed; installation and live reception pending |
 
-One project targets one game. DCS is **not supported in 0.2.1**.
+One project targets one game. DCS projects now receive native telemetry through a dedicated exporter. Settings → Set DCS Telemetry automatically discovers profiles and offers Add Scripts, Update Scripts, Restore Scripts and Remove Scripts. It edits only Stella-related lines in the current Export.lua; restoration of modified scripts requires confirmation. The default interval is 50 ms (10–100 ms); edits to the number in config.lua are read back by the dialog. Restart DCS after changes. Remove Scripts also removes Export.lua when no bytes remain. DCS default effects are not included yet.
 
 ## Devices and requirements
 

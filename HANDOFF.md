@@ -1,5 +1,46 @@
 # Stella Vibra 인수인계
 
+## 최신 작업 — 2026-11-14 config 숫자 편집 허용·빈 Export 삭제·커밋
+
+- 사용자 요청: config.lua 숫자만 바꾼 경우 실제 값을 설정 창에 표시하고 해시 손상으로 처리하지 않는다. 파일 전체를 실행 없이 정해진 주석/return 형식으로 파싱하며 LF/CRLF·정수10–100ms 허용. 숫자 외 형식 변경/범위 오류는 Restore. config 값은 manifest의 저장 주기보다 우선한다.
+- 무결성 해시는 loader.lua/telemetry.lua에만 적용한다. 이전 manifest의 config 해시는 무시하며 새 저장에서 제외한다. 확인 중 파일 변경 검출용 fingerprint에는 config도 포함한다.
+- Remove에서 Stella 행을 제거한 결과가 정확히0바이트면 Export.lua 자체도 삭제. 공백/개행/BOM이 남으면 보존한다. 공유 파일 전체 복원은 하지 않는다.
+- 검증: 최종 scripts/build.ps1 -Deploy exit0, C++ 컴파일·링크 및43개 Lua 구문 검사 통과. diff --check 및 Release/dist 런처·앱·PDB·README·MANUAL·DCS Lua 해시 일치 확인. GUI·실제 사용자 파일 설치/삭제/복구·앱/DCS/HID·런타임 테스트 없음. 버전0.2.1 유지.
+- 이번 사용자 승인으로 누적 DCS 자동 탐색·설치/복구·수신·문서 변경을 한 로컬 커밋으로 정리한다. 태그/Release/푸시 없음. 사용자 확인 대상은 설정 숫자 수정 후 다시 열기, 범위/형식 오류 Restore, Remove 후0바이트 삭제와 다른 행 보존이다.
+## 최신 작업 — 2026-11-14 DCS 로더 행 관리·복구 UI
+
+- 사용자 요청 검토: 공유 Export.lua는 현재 Stella 관련 행만 관리하고 과거 전체 원본을 복원하지 않는 방식이 적합하다. 전체 Export 백업/원본 메타데이터/전체 복원과 새 백업 생성 제거. 과거 백업 폴더는 그대로 둔다.
+- UI는 경로 → 주기 → Add/Update/Restore Scripts → Remove Scripts → Done. 로더 없음 Add, 정확한 한 행+관리 파일 해시 정상 Update(항상 활성), 수정/중복 행·손상/누락 파일 Restore. 복구는 상세 행 표시+기본No 확인. Remove는 해시 불일치여도 가능하며 전용 폴더 전체 삭제 범위를 확인한다.
+- 현재 Export.lua에서 대소문자 무관 StellaVibra/Stella Vibra 포함 물리 행만 교체/제거한다. 복구 시 하나로 통합, 다른 행 바이트/BOM/개행 보존. 한 행에 섞인 다른 코드도 바뀐다는 점을 확인창에 명시한다. 임의 다중행 Lua 파싱은 하지 않는다.
+- manifest schema2는 원본 Export를 저장하지 않는다. 이전 schema1은 해시/주기만 읽어 호환하며 다음 저장에서 구 원본 메타데이터를 제거한다. 확인 중 파일 변경은 fingerprint로 거부, 실패 롤백은 전용 관리 파일만 대상으로 한다. 공유 Export 전체 복원 없음.
+- Remove는 canonical 경계/하위 링크 검사 후 전용 폴더 내용 전체 삭제. 다른 exporter·과거 백업은 보존. 실제 사용자 파일 설치/복구/삭제 및 앱·DCS·HID·테스트 실행 없음.
+- 검증: 최종 scripts/build.ps1 -Deploy exit0. C++ 컴파일·링크 및 43개 Lua 구문 검사, diff --check 통과. Release/dist 런처·앱·PDB·README·MANUAL·DCS Lua 해시 일치. GUI/실제 설치·복구·삭제는 사용자 확인 전이다. 버전0.2.1 유지, 기존 미커밋 변경 보존. 커밋/태그/Release/푸시 없음. 사용자가 확인할 항목: 변형 로더/파일의 Restore 취소·승인, Add/Update 상태, 다른 exporter 행 보존, 손상 상태 Remove.
+## 최신 작업 — 2026-11-14 DCS 실제 설치 및 프로젝트 수신
+
+- 사용자 확인: 자동 탐색 정상. 이번 요청으로 UI 한정 범위를 넘어 실제 Add/Update/Remove와 DCS 프로젝트 수신을 구현한다. 효과 Lua는 아직 만들지 않는다.
+- dcs/loader.lua·telemetry.lua 번들, 별도 config.lua 생성, manifest 기반 SHA-256 검사. Export.lua 정확한 한 줄만 추가하며 변경 전 고유 백업/파일별 QSaveFile 사용. 중복·수정·부분 설치는 거부한다. UTF16/32 편집도 거부한다. 제거는 관리 행/검증된 관리 파일만 대상으로 한다.
+- Lua는 원본 콜백 체이닝/중복 로드 방지/오류 격리, 기본50ms(10–100ms) 프레임 제한 송신, nil 생략, ownship 권한 존중. 설정/코드는 DCS 재시작 후 반영한다.
+- DCS Target Game 추가, 효과 없는 프로젝트 생성 가능. UDP127.0.0.1:43891 배타 바인딩은 해당 프로젝트 활성 중에만 수행한다. JSON 프로토콜1/최대16KiB, 세션·순번·송신 시각/500ms 유효기간 검증. 세션/객체ID/시간역행/공백에서 Lua 인스턴스와 출력 요청 초기화. 동일 스냅샷의 원래 수신 시각/기한 보존.
+- Telemetry 뷰 및 자동완성은 telemetry.dcs 원본 경로와 transport 메타데이터를 제공한다. 무장/기총은 아직 수집하지 않는다. 기어 rod 의미/기체별 반환/실제 진동은 검증하지 않았다.
+- 상세 파일·전송·원본 보존·실패 한계는 docs/DCS-INTEGRATION.md. README/MANUAL/CONTRACTS/WORKFLOWS/DEVELOPMENT 갱신.
+- 검증: 최종 scripts/build.ps1 -Deploy exit0, 컴파일·링크 및 기존41개+신규2개 Lua 구문 검사 통과. 생성 config 형식도 LuaCompiler -p로 별도 구문 확인. Release/dist 런처·앱·PDB·DCS Lua·README·MANUAL 해시 일치, 소스/배포 Lua·문서 일치, 버전0.2.1 및 diff --check 확인. 첫 컴파일에서 다른 다이얼로그에 잘못 추가된 게임 선택 연결을 발견해 제거했다. 실제 사용자 Export.lua 설치/제거·앱/DCS/HID/런타임 테스트는 수행하지 않았다. 기존 미커밋 UI 변경 보존. 버전0.2.1 유지, 커밋·태그·Release·푸시 없음.
+- 사용자 다음 확인: Add → DCS 재시작 → DCS 빈 프로젝트 생성 → Telemetry Live/원본 값·pause·임무 종료·기체 변경 확인. Update 주기/코드·Remove/백업 보존도 별도 확인. 기본 효과는 후속 단계다.
+## 최신 작업 — 2026-11-14 DCS 자동 탐색·단순 UI
+
+- 사용자 최신 요청/응답: 경로 선택 UI 제거, 자동 발견. 주기는 ms. 고정 중계 코드와 별도 주기 설정 파일을 StellaVibra Telemetry 아래 두는 방향에 동의했고 이번에는 UI까지만 진행하기로 했다.
+- SHGetKnownFolderPath(FOLDERID_SavedGames)로 실제 Saved Games를 조회하고 직속 DCS/DCS.* 및 Config/options.lua·Logs/dcs.log를 함께 가진 사용자 지정 프로필 후보를 탐색한다. 하나면 자동 선택, 여러 개면 발견된 프로필 콤보만 표시한다. 미발견은 안내하며 임의 디렉토리를 생성하지 않는다.
+- Browse/수기 경로/Save Selection/Refresh 버튼 삭제. 대상·상태·Update interval(50ms) 및 Add/Update Script → Remove Script → Done으로 단순화했다. dcs_scripts_path pref는 더 이상 참조/저장하지 않으며 기존 값은 삭제하지 않는다.
+- 중계기/설치기가 아직 없으므로 주기 입력과 Add/Update/Remove는 비활성이다. 이름 흔적은 설치 인증/버전 판정이 아니며 현재는 버튼 문구만 변경한다. 다음 구현에서 버전/주기 변경 시 Update, 실제 설치 때만 Remove를 활성화해야 한다.
+- DCS 공식 설치 예제에서 파일 자체가 아니라 콜백이 반복 호출됨을 확인했다. Export.lua 고정 로더, 별도 설정/콜백 체이닝 방향을 CONTRACTS에 기록했다. 포트/프로토콜/로더 파일명·API/주기 범위·적용 시점은 미확정이다.
+- 검증: 최종 scripts/build.ps1 -Deploy exit0. C++ 컴파일·링크 및 기존41개 Lua 구문 검사, diff --check 통과. Release/dist 런처·앱·PDB·README·MANUAL 해시 일치. 이번 UI의 실제 자동 발견·GUI 동작은 사용자 확인 전이다. 실제 사용자 Export.lua 설치/삭제, 앱·DCS·HID·런타임 테스트 실행 없음. 버전0.2.1 유지, 커밋/푸시/태그/Release 없음.
+## 최신 작업 — 2026-11-14 DCS 설정 메뉴 선행 구현
+
+- 사용자 확인: f002a63의 이름 오름차순 정렬 정상. 최신 효과 제안 방향 승인(상세 DCS-TELEMETRY), 이번 요청은 메뉴/상태 검사만이며 중계기 자체는 만들지 않는다.
+- Settings → Set DCS Telemetry... 추가. 프로필/Scripts Browse와 절대 Scripts 경로 입력, 실제 Export.lua 경로, 상태, 기본20 FPS/50ms, Add Script/Update Timing·Remove Script·Refresh Status·Save Selection/Cancel 제공.
+- 앱 시작 시 저장 경로를 읽기 전용 검사해 로그 기록. 메뉴 열기/선택/편집 완료/Refresh에서도 재검사한다. 경로 미선택/폴더·파일 없음/읽기 실패/1MiB 초과/읽기 가능/이름 흔적을 구분한다. 자동 프로필 탐색이나 선택은 없다.
+- 로더 계약이 없으므로 Stella 문자열은 힌트일 뿐 설치 인증 아님을 명시한다. 주석도 매칭 가능하며 흔적 발견 시 버튼 문구만 Update Timing으로 바뀐다. 설치·주기·제거 버튼 및 FPS는 모두 비활성. 중계기 구현 시 실제 설치 검사/활성화와 FPS 범위·반영 정책을 확정해야 한다.
+- Save Selection은 앱 pref dcs_scripts_path만 저장한다. DCS 폴더/Export.lua/중계기/설정 생성·편집 없음. 실행 검증을 위해 사용자 Export.lua를 도구로 읽거나 수정하지 않았다.
+- 검증: 중단된 빌드 세션은 종료되어 재실행했다. 최종 scripts/build.ps1 -Deploy exit0, C++ 컴파일·링크 및 기존 41개 Lua 구문 검사 통과. Release/dist 런처·앱·PDB·README·MANUAL 해시 일치, 앱 버전0.2.1 및 diff --check 확인. 앱·GUI·DCS·HID·런타임 테스트 없음. 버전0.2.1 유지, 새 커밋·태그·Release·푸시 없음. 다음 사용자 확인은 경로 선택/취소/저장 후 재시작 검사 로그와 상태 표시다.
 ## 최신 작업 — 2026-11-13 정렬 방식 교체 및 0.2.1 로컬 커밋
 
 - 사용자 보고: 아래 이전 작업의 강제 재정렬로는 이름 오름차순 문제가 해결되지 않았다. 이전 기록을 GUI 검증 완료로 해석하지 않는다.

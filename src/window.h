@@ -42,6 +42,8 @@ private:
     QSet<QString> effectDirectoriesToExpand;
     void expandEffectFolders();
     void setTimingsDialog(); void setChannelsDialog(); void aboutDialog();
+    void setDcsTelemetryDialog();
+    void checkDcsTelemetry();
     void showDocumentation(const QString& relative,const QString& title);
     bool paused=false;
     qint64 nextFileScan=0;

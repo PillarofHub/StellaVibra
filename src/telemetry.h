@@ -52,7 +52,7 @@ inline const QList<SimVariable>& simVariables() {
 }
 inline QJsonObject telemetryObject(const Telemetry& t) {
     if(!t.sequence)return {};
-    if(t.game=="WarThunder" || t.game=="XPlane12")return t.values;
+    if(t.game=="WarThunder" || t.game=="XPlane12" || t.game=="DCS")return t.values;
     auto result=t.values;QJsonArray gears;
     for(int i=0;i<3;++i)gears.append(QJsonObject{{"contact",t.contact[i]},{"animation_percent",t.animation[i]}});
     result["sample_id"]=double(t.sequence);result["received_ms"]=double(t.received);

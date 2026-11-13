@@ -1,9 +1,24 @@
 #pragma once
 #include "model.h"
 namespace sv {
-inline QStringList targetGames(){return {"MSFS2024","MSFS2020","XPlane12","WarThunder"};}
-inline QString gameLabel(const QString& game){return game=="MSFS2024"?"MSFS 2024":game=="MSFS2020"?"MSFS 2020":game=="XPlane12"?"X-Plane 12":game=="WarThunder"?"War Thunder":"No project";}
+inline QStringList targetGames(){return {"MSFS2024","MSFS2020","XPlane12","WarThunder","DCS"};}
+inline QString gameLabel(const QString& game){return game=="MSFS2024"?"MSFS 2024":game=="MSFS2020"?"MSFS 2020":game=="XPlane12"?"X-Plane 12":game=="WarThunder"?"War Thunder":game=="DCS"?"DCS":"No project";}
 struct Dataref {QString name;int frequency;};
+inline QMap<QString,QString> dcsVariables(){return {
+    {"LoIsOwnshipExportAllowed","Export permission"},{"LoSimulationOnPause","Bool"},{"LoSimulationOnActivePause","Bool"},
+    {"LoGetSelfData.Name","Aircraft type"},{"LoGetPlayerPlaneId","Object ID"},{"LoGetInAir","Bool"},
+    {"LoGetIndicatedAirSpeed","Native API value"},{"LoGetTrueAirSpeed","m/s"},{"LoGetMachNumber","Mach"},
+    {"LoGetAngleOfAttack","rad"},{"LoGetShakeAmplitude","Native amplitude"},
+    {"LoGetAccelerationUnits.x","G"},{"LoGetAccelerationUnits.y","G"},{"LoGetAccelerationUnits.z","G"},
+    {"LoGetVectorVelocity.x","World-axis velocity (native)"},{"LoGetVectorVelocity.y","World-axis velocity (native)"},{"LoGetVectorVelocity.z","World-axis velocity (native)"},
+    {"LoGetAngularVelocity.x","rad/s"},{"LoGetAngularVelocity.y","rad/s"},{"LoGetAngularVelocity.z","rad/s"},
+    {"LoGetMechInfo.gear.status","Native status"},{"LoGetMechInfo.gear.value","Native value"},
+    {"LoGetMechInfo.gear.main.left.rod","Native rod; unit unverified"},{"LoGetMechInfo.gear.main.right.rod","Native rod; unit unverified"},
+    {"LoGetMechInfo.gear.main.nose.rod","Native rod; unit unverified"},
+    {"LoGetMechInfo.flaps.status","Native status"},{"LoGetMechInfo.flaps.value","Native value"},
+    {"LoGetMechInfo.speedbrakes.status","Native status"},{"LoGetMechInfo.speedbrakes.value","Native value"},
+    {"LoGetEngineInfo.RPM.left","%"},{"LoGetEngineInfo.RPM.right","%"}
+};}
 // Native RREF catalog referenced from Aurora Vibra (MIT; licenses/Aurora-MIT.txt).
 inline const QList<Dataref>& xplaneVariables(){static const QList<Dataref> fields{
         {"sim/flightmodel/position/indicated_airspeed",20},

@@ -6,6 +6,7 @@ void Window::newProject() {
     QDialog dialog(this);dialog.setWindowTitle("New Project");dialog.resize(620,180);QFormLayout form(&dialog);
     QWidget location;QHBoxLayout row(&location);row.setContentsMargins(0,0,0,0);QLineEdit directory;QPushButton browse("Browse...");row.addWidget(&directory,1);row.addWidget(&browse);form.addRow("Project Directory",&location);
     QWidget games;QVBoxLayout gameLayout(&games);gameLayout.setContentsMargins(0,0,0,0);QButtonGroup gameGroup;const auto choices=targetGames();for(int i=0;i<choices.size();++i){auto* button=new QRadioButton(gameLabel(choices[i]));gameLayout.addWidget(button);gameGroup.addButton(button,i);if(!i)button->setChecked(true);}form.addRow("Target Game",&games);QCheckBox generate("Generate default Lua scripts");generate.setChecked(true);form.addRow(&generate);
+    connect(&gameGroup,&QButtonGroup::idClicked,&dialog,[&](int id){const bool available=choices[id]!="DCS";generate.setEnabled(available);generate.setChecked(available);});
     QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);form.addRow(&buttons);
     connect(&browse,&QPushButton::clicked,&dialog,[&]{
         // The native existing-directory picker rejects new paths. This picker
@@ -42,7 +43,7 @@ void Window::newProject() {
     connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);if(dialog.exec()!=QDialog::Accepted)return;
     const auto game=choices[gameGroup.checkedId()];auto folder=QDir::cleanPath(QDir::fromNativeSeparators(directory.text().trimmed()));QJsonArray effects;
     QMap<QString,QString> sources;
-    if(generate.isChecked()) {
+    if(generate.isChecked() && game!="DCS") {
         auto base=appRoot()+"/effects/"+game;QDirIterator it(base,{"*.lua"},QDir::Files,QDirIterator::Subdirectories);
         while(it.hasNext()){auto file=it.next();sources["effects/"+QDir(base).relativeFilePath(file)]=file;}
         require(!sources.isEmpty(),"Bundled default scripts are missing");
@@ -75,6 +76,7 @@ void Window::setChannelsDialog() {
     for(const auto& key:QStringList{"Yoke","Stick","Throttle","Pedal"}){
         auto* spin=new QSpinBox(&dialog);spin->setRange(0,4);spin->setValue(std::clamp(counts[key].toInt(4),0,4));controls[key]=spin;form.addRow(key=="Pedal"?"Rudder":key,spin);
     }
+
     QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);form.addRow(&buttons);
     connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     if(dialog.exec()!=QDialog::Accepted)return;

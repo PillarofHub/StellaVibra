@@ -130,6 +130,7 @@ Window::Window() {
     view->addSeparator();auto* resetView=view->addAction("Reset Default Layout");connect(resetView,&QAction::triggered,this,[this,left,effectDock,right,bottom,telemetryDock,applyDefaultSizes]{restoreState(defaultLayout);for(auto* dock:{left,effectDock,right,bottom,telemetryDock}){dock->setFloating(false);dock->show();}applyDefaultSizes();QTimer::singleShot(0,this,[this,applyDefaultSizes]{applyDefaultSizes();saveLocal();});});
     auto* settingsMenu=menuBar()->addMenu("Settings");connect(settingsMenu->addAction("Set Timings..."),&QAction::triggered,this,[this]{guarded([this]{setTimingsDialog();});});
     connect(settingsMenu->addAction("Set Channels..."),&QAction::triggered,this,[this]{guarded([this]{setChannelsDialog();});});
+    connect(settingsMenu->addAction("Set DCS Telemetry..."),&QAction::triggered,this,[this]{guarded([this]{setDcsTelemetryDialog();});});
     auto* help=menuBar()->addMenu("Help");
     connect(help->addAction("README"),&QAction::triggered,this,[this]{guarded([this]{showDocumentation("README.md","Stella Vibra — README");});});
     auto* manual=help->addAction("User Manual");manual->setShortcut(QKeySequence::HelpContents);
@@ -145,7 +146,7 @@ Window::Window() {
         restoreState(QByteArray::fromBase64(local["layout"].toString().toLatin1()));
     else QTimer::singleShot(0,this,applyDefaultSizes);
     captureLayoutTimer.start();
-    connect(&timer,&QTimer::timeout,this,[this]{tick();});timer.start(20);addLog("Automatic MSFS and supported HID discovery enabled. Use Stop All to pause output.");QTimer::singleShot(0,this,[this]{auto path=local["last_project"].toString();if(!path.isEmpty() && QFileInfo::exists(path)) {try{loadProject(path);}catch(const std::exception& e){addLog(QString("Last project could not be opened: ")+e.what());closeProject();}}});
+    connect(&timer,&QTimer::timeout,this,[this]{tick();});timer.start(20);checkDcsTelemetry();addLog("Automatic MSFS and supported HID discovery enabled. Use Stop All to pause output.");QTimer::singleShot(0,this,[this]{auto path=local["last_project"].toString();if(!path.isEmpty() && QFileInfo::exists(path)) {try{loadProject(path);}catch(const std::exception& e){addLog(QString("Last project could not be opened: ")+e.what());closeProject();}}});
 }
 Window::~Window(){engine.stop();}
 QSize Window::dockSpace() const {
@@ -253,6 +254,15 @@ void Window::tick(){if(nowMs()>=nextFileScan){nextFileScan=nowMs()+1000;try{sync
             fields["msfs.paused"]={values["msfs"].toObject()["paused"],"Pause_EX1"};
         } else if(game=="XPlane12"){
             for(const auto& field:xplaneVariables())fields[field.name]={values[field.name],"Native dataref / "+QString::number(field.frequency)+" Hz"};
+        } else if(game=="DCS"){
+            const auto catalog=dcsVariables();
+            for(auto it=catalog.begin();it!=catalog.end();++it){QJsonValue value=values["dcs"];
+                for(const auto& part:it.key().split('.'))value=value.toObject()[part];
+                fields["dcs."+it.key()]={value,it.value()};
+            }
+            const auto transport=values["transport"].toObject();
+            for(const auto& key:QStringList{"protocol","session","sequence","sim_time","sent_ms","interval_ms","stopped"})fields["transport."+key]={transport[key],"DCS transport"};
+            for(const auto& key:QStringList{"sample_id","received_ms","aircraft_key","sim_time_advanced"})fields[key]={values[key],"Host metadata"};
         } else if(game=="WarThunder"){
             for(const auto& endpoint:{QString("state"),QString("indicators")}){
                 const auto object=values[endpoint].toObject();auto keys=endpoint=="state"?warThunderStateKeys():warThunderIndicatorKeys();keys+=object.keys();keys.removeDuplicates();

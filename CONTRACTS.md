@@ -1,5 +1,15 @@
 # MVP 계약 (형식 1)
 
+## DCS 설치·수신 구현 (2026-11-14)
+
+사용자가 자동 탐색 정상 동작을 확인하고 실제 스크립트 설치와 DCS 프로젝트 수신 구현을 요청했다. 이전 UI 한정 범위는 이번 요청으로 대체된다. 효과 Lua는 아직 구현하지 않는다.
+
+상세 계약은 [DCS-INTEGRATION](docs/DCS-INTEGRATION.md)에 있다. Export.lua 고정 로더 한 줄 → Scripts/StellaVibra Telemetry/loader.lua → telemetry.lua 및 별도 config.lua, 설치 소유권/해시 manifest.json. 시작/메뉴에서 정확한 관리 행·파일 해시를 검사하며 Add/Update Script·Remove Script가 실제 동작한다. 로더 없음은 Add Scripts, 정상 로더/해시는 항상 Update Scripts, 수정된 Stella 행·무결성 오류는 확인 후 Restore Scripts. 행 또는 전용 폴더가 있으면 해시 불일치라도 Remove Scripts를 허용한다. 기본50ms/범위10–100ms, DCS 재시작 후 반영한다.
+
+로컬 UDP 127.0.0.1:43891, 프로토콜1, JSON/16KiB 상한, 세션·순번·시각·권한·상태와 DCS 원본 입력. 별도 서버 없음. DCS 프로젝트 활성 동안만 수신하며 공백/세션·객체 교체에서 상태를 초기화한다. 신호 누락은 nil, 수명500ms와 송신 후 남은 수명을 함께 적용한다. 동일 스냅샷 재전달로 수신 시각/유효기한을 갱신하지 않는다.
+
+Export.lua 전체 백업·원본 저장·전체 복원은 하지 않는다. 현재 파일의 Stella 관련 행만 교체/삭제하고 다른 바이트는 그대로 보존한다. 수정/중복/부분 설치는 확인 후 복구한다. Remove는 확인 후 전용 폴더 내용 전체를 삭제한다. UTF-16/32 등 비호환 인코딩·링크는 거부하며 파일별 원자 저장·실패 시 관리 파일만 롤백한다. 정확한 대상 행 판별·끝 개행·동시 편집 제한은 상세 계약 참조. config.lua는 코드 해시 검사가 아니라 전체 고정 형식과 정수10–100 범위를 직접 파싱한다. 숫자만 편집했으면 설정 창에서 현재값을 표시하며 정상 취급한다. 코드 Lua 두 개만 manifest 해시로 검증한다. Remove 후 Export.lua가 정확히0바이트면 삭제하며 BOM/공백/개행이 남으면 보존한다. 실제 사용자 Export.lua 설치/제거 및 런타임 테스트는 도구로 수행하지 않는다.
+
 ## DCS 후속 작업 — 입력 조사 후 효과 범위 논의 (2026-11-13)
 
 최신 사용자 결정: MSFS와의 억지 일치 금지. Ground Roll, Airframe Shake, G Load, 선택적 Overspeed를 유지하고 High AoA/별도 Stall Buffet 및 Ground Thumps는 기본 효과에서 제외한다. Touchdown은 rod 기반 첫 상승을 먼저 구현·사용자 확인하고 문제가 있으면 통합 착지 출력으로 단순화한다. rod의 단위/갱신이 검증되었다는 뜻은 아니다. Engine RPM은 Shake 통합/공명 검토 후 보류 권고(최종 채택 미정), Startup/Shutdown·무장은 기존 후보로 남으며 새로 확정하지 않았다. 상세 최신 표는 docs/DCS-TELEMETRY.md의 후속 사용자 결정 절이다. 이전 후보 권고보다 이 결정이 우선한다.

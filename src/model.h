@@ -32,13 +32,14 @@ struct Parameter { QString name,type; QStringList choices; bool boolean=false; Q
 struct Telemetry {
     quint64 sequence=0;
     qint64 received=0, advancedAt=0;
+    qint64 sourceDeadline=0;
     double simTime=0, speed=0;
     bool ground=false, paused=false, advanced=false;
-    QString aircraft,game;
+    QString aircraft,game,session;
     QJsonObject values;
     std::array<bool,3> contact{};
     std::array<double,3> animation{};
-    bool valid(qint64 now) const { return sequence && !paused && now-received<500 && now-advancedAt<500 && !aircraft.isEmpty(); }
+    bool valid(qint64 now) const { return sequence && !paused && now-received<500 && now-advancedAt<500 && (!sourceDeadline || now<sourceDeadline) && !aircraft.isEmpty(); }
 };
 enum class Mode { Off, Constant, Pwm };
 struct Request { QString key; QStringList destinations; Mode mode=Mode::Off; int strength=0,on=0,period=20; qint64 deadline=0,phase=0; };

@@ -4,16 +4,16 @@
 namespace sv {
 NetworkTelemetry::NetworkTelemetry(QString target):game(std::move(target)) {
     if(game=="WarThunder") {http=std::make_unique<QNetworkAccessManager>();http->setProxy(QNetworkProxy::NoProxy);}
-    else {udp=std::make_unique<QUdpSocket>();require(udp->bind(QHostAddress::LocalHost,0),"Cannot bind X-Plane UDP socket");}
+    else {udp=std::make_unique<QUdpSocket>();require(udp->bind(QHostAddress::LocalHost,game=="DCS"?43891:0,QUdpSocket::DontShareAddress),game=="DCS"?"Cannot bind DCS UDP port 43891 (already in use?)":"Cannot bind X-Plane UDP socket");}
 }
 NetworkTelemetry::~NetworkTelemetry() {
     for(auto*& reply:replies)if(reply){reply->abort();delete reply;reply=nullptr;}
-    if(udp)for(int i=0;i<xplaneVariables().size();++i)sendSubscription(i,0);
+    if(udp && game=="XPlane12")for(int i=0;i<xplaneVariables().size();++i)sendSubscription(i,0);
 }
 bool NetworkTelemetry::connected() const {return lastResponse && nowMs()-lastResponse<1500;}
 QList<Telemetry> NetworkTelemetry::poll() {
     events.processEvents(QEventLoop::AllEvents);
-    auto result=game=="WarThunder"?pollWarThunder():pollXPlane();
+    auto result=game=="WarThunder"?pollWarThunder():game=="DCS"?pollDcs():pollXPlane();
     status=!connected()?"Disconnected / retrying":previous.paused?"Connected / inactive or paused":previous.valid(nowMs())?"Connected":"Connected / waiting for fresh telemetry";
     return result;
 }

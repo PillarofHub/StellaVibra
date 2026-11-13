@@ -104,8 +104,8 @@ void Engine::runtimeLoop() {
             if(samples.isEmpty() && now-lastUpdate>=maximumUpdateMilliseconds.load()) samples<<telemetry;
             for(auto t:samples) {
                 bool fresh=t.sequence!=telemetry.sequence;
-                bool reset=t.aircraft!=telemetry.aircraft || t.simTime<telemetry.simTime || generation.load()!=localGeneration;
-                telemetry=t; now=nowMs(); bool valid=t.valid(now) && (network?network->connected():sim.connected()); inputDeadline=valid?std::min(t.received+500,t.advancedAt+500):0;
+                bool reset=t.session!=telemetry.session || t.aircraft!=telemetry.aircraft || t.simTime<telemetry.simTime || generation.load()!=localGeneration;
+                telemetry=t; now=nowMs(); bool valid=t.valid(now) && (network?network->connected():sim.connected()); inputDeadline=valid?std::min({t.received+500,t.advancedAt+500,t.sourceDeadline?t.sourceDeadline:t.received+500}):0;
                 if(wasValid && !valid) reset=true; wasValid=valid;
                 if(reset) { loggedFirstUpdate=false;localGeneration=generation.load(); { std::lock_guard lock(mutex); requests.clear(); } if(hasActive) effects=instantiate(active,t.aircraft); }
                 { std::lock_guard lock(mutex); aircraftKey=t.aircraft; execution=running?(hasActive?(valid?"Running":"Running / waiting for valid telemetry"):"Waiting for a project"):"Stopped"; }

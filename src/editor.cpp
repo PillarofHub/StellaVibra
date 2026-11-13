@@ -75,7 +75,7 @@ void Editor::completeMember() {
         candidates->setStringList(keys);completion->setCompletionPrefix(lookup.captured(3));
         if(completion->completionCount()){completion->popup()->setCurrentIndex(completion->completionModel()->index(0,0));auto rect=cursorRect();rect.setWidth(480);completion->complete(rect);}return;
     }
-    auto match=QRegularExpression(R"((\btelemetry(?:\.msfs|\.state|\.indicators|\.gears\[[^\]\n]+\])?|parameters(?:\.[A-Za-z_][A-Za-z_0-9]*)?|context|gear)([:.])([A-Za-z_][A-Za-z_0-9]*|)$)").match(before);
+    auto match=QRegularExpression(R"((\btelemetry(?:\.dcs(?:\.[A-Za-z_][A-Za-z_0-9]*)*|\.transport|\.msfs|\.state|\.indicators|\.gears\[[^\]\n]+\])?|parameters(?:\.[A-Za-z_][A-Za-z_0-9]*)?|context|gear)([:.])([A-Za-z_][A-Za-z_0-9]*|)$)").match(before);
     if(!match.hasMatch())return;
     const auto object=match.captured(1),separator=match.captured(2);QStringList names;
     if(object=="context") {
@@ -84,7 +84,14 @@ void Editor::completeMember() {
     }
 
     else if(separator==".") {
-        if(game=="WarThunder" && object=="telemetry")names={"state","indicators"};
+        if(game=="DCS" && object=="telemetry")names={"dcs","transport","sample_id","received_ms","aircraft_key","sim_time_advanced"};
+        else if(game=="DCS" && object=="telemetry.transport")names={"protocol","session","sequence","sim_time","sent_ms","interval_ms","stopped"};
+        else if(game=="DCS" && (object=="telemetry.dcs" || object.startsWith("telemetry.dcs."))){
+            const auto prefix=object=="telemetry.dcs"?QString():object.mid(QString("telemetry.dcs.").size())+".";
+            for(const auto& key:dcsVariables().keys())if(key.startsWith(prefix))names<<key.mid(prefix.size()).section('.',0,0);
+            names.removeDuplicates();
+        }
+        else if(game=="WarThunder" && object=="telemetry")names={"state","indicators"};
         else if(game=="WarThunder" && (object=="telemetry.state" || object=="telemetry.indicators")) {
             auto keys=object.endsWith(".state")?warThunderStateKeys()+property("wtStateKeys").toStringList():warThunderIndicatorKeys()+property("wtIndicatorKeys").toStringList();
             for(const auto& key:keys)if(luaIdentifier(key))names<<key;names.removeDuplicates();

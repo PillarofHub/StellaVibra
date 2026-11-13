@@ -69,6 +69,29 @@ Parameter changes affect execution immediately but still need saving to persist.
 
 Numeric parameters have a slider and a number field. Unnecessary trailing zeroes are hidden. `haptic_power` combines strength (0–255), a PWM checkbox, ON time, and period. Timing fields appear when PWM is selected. ON cannot exceed period; effective PWM timing is rounded to the HID tick.
 
+## DCS telemetry setup
+
+Settings → **Set DCS Telemetry...** automatically discovers profiles in the Windows Saved Games location, including relocated Saved Games. Standard DCS / DCS.* folders and custom profiles containing Config/options.lua and Logs/dcs.log are candidates. One is selected automatically; if several are found, choose the intended profile from the detected list. Check the displayed target.
+
+Choose **Update interval** in milliseconds: default **50 ms**, range **10–100 ms**. The dialog shows the detected path, interval, **Add / Update / Restore Scripts**, **Remove Scripts**, then **Done**. Restart DCS after changes; timing is not hot-reloaded. You may edit only the interval number in config.lua (10–100 ms); reopening this dialog displays that value without requesting restoration. The full config format is checked directly, without executing Lua or comparing its manifest hash. LF and CRLF are accepted; other format changes or invalid numbers require Restore Scripts.
+
+- **Add Scripts**: Export.lua is absent or contains no Stella Vibra line.
+- **Update Scripts**: one exact loader line and verified managed files exist. This button remains enabled even when already up to date.
+- **Restore Scripts**: Stella-related lines differ from the standard loader, are duplicated, or managed files are missing/modified. A confirmation with affected-line details is required. Add also asks before repairing leftover modified files.
+- **Remove Scripts**: enabled when Stella-related lines or the dedicated folder exist, even if file hashes do not match. Confirmation covers deleting the entire **StellaVibra Telemetry** folder, including modified and additional files.
+
+The installer keeps loader.lua, telemetry.lua, config.lua and manifest.json under **Scripts/StellaVibra Telemetry**. It does not back up or restore the whole Export.lua. It reads the current file and changes only physical lines containing StellaVibra or Stella Vibra (case-insensitive), preserving all other bytes. Restore consolidates those lines into one standard loader; confirmation warns that other code on the same physical line is also replaced. Remove deletes those lines and also deletes Export.lua if exactly zero bytes remain. Whitespace, line endings or a BOM still count as remaining bytes and are preserved. Existing backup folders from older builds are not touched.
+
+Each file is saved atomically, but the installation is not one multi-file transaction. If files change during confirmation, the operation stops. Modified managed files can be repaired through Restore Scripts. UTF-16/32 Export.lua files and linked installation paths are not automatically modified. Do not run another exporter installer simultaneously.
+
+Create or open a project with **Target Game: DCS** to receive telemetry. No DCS default effects are generated yet. Other games keep their own connections. The DCS receiver binds only **127.0.0.1:43891 (UDP)** and closes when you switch games or close the project. A port conflict is reported in Debug Output. No separate server is required.
+
+The relay uses DCS frame callbacks, sends at most once per configured interval, and cannot run faster than DCS frames. Packets carry protocol version 1, session, sequence, simulation and send times, pause/export permission state and selected native values. Duplicate, out-of-order, malformed and old packets are ignored. Input expires within 500 ms of sending or simulation-clock progress; replaying a snapshot inside Stella does not renew its lifetime. The first sample after a session/aircraft change or long gap establishes a baseline.
+
+The Telemetry view and Lua completion expose **telemetry.dcs** with native API names, such as **LoGetInAir**, **LoGetShakeAmplitude**, **LoGetAccelerationUnits**, **LoGetMechInfo** and **LoGetEngineInfo.RPM**. **telemetry.transport** holds packet metadata. Missing values are nil, not measured zero. Ownship export restrictions are respected. This does not read force-feedback commands, and gear rod units/behavior remain aircraft-dependent and unverified. Weapon and cockpit-specific signals are not collected in this version.
+
+Automatic profile discovery has been confirmed by the project owner. Installation/removal, exporter coexistence and live DCS reception still require user verification.
+
 ## Devices and routing
 
 The implemented WINCTRL vendor ID is `4098` (hex). Only known product IDs and compatible HID output descriptors are opened; other joysticks are not generic fallback targets.
@@ -192,4 +215,4 @@ Debug Output is also recorded under `diagnostics/`. Session logs rotate at 2MiB,
 
 Help → README and Help → User Manual display local Markdown in a nonmodal document window. Back/Forward/Home navigate documents; web links open your browser. About shows version and license information. Keep the full package, including docs and logo assets, together.
 
-Version 0.2.1 is a local build without a release tag or published release. Explorer file management GUI checks remain pending. See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for earlier verification history. DCS, remote simulator connections, arbitrary device protocols and a full IDE/debugger are outside this release.
+Version 0.2.1 is a local build without a release tag or published release. Explorer file management GUI checks remain pending. See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for earlier verification history. DCS default effects, remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.

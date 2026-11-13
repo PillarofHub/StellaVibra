@@ -23,8 +23,14 @@ private:
     QJsonObject datarefs;
     QMap<QString,qint64> updated;
     Telemetry previous;
+    QString dcsSession;
+    QStringList retiredDcsSessions;
+    quint64 dcsSequence=0,dcsEpoch=0;
+    qint64 dcsSent=0;
+    quint16 dcsPort=0;
     void sendSubscription(int index,int frequency);
     QList<Telemetry> pollWarThunder();
     QList<Telemetry> pollXPlane();
+    QList<Telemetry> pollDcs();
 };
 }
