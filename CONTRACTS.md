@@ -1,5 +1,30 @@
 # MVP 계약 (형식 1)
 
+## DCS 후속 작업 — 입력 조사 후 효과 범위 논의 (2026-11-13)
+
+최신 사용자 결정: MSFS와의 억지 일치 금지. Ground Roll, Airframe Shake, G Load, 선택적 Overspeed를 유지하고 High AoA/별도 Stall Buffet 및 Ground Thumps는 기본 효과에서 제외한다. Touchdown은 rod 기반 첫 상승을 먼저 구현·사용자 확인하고 문제가 있으면 통합 착지 출력으로 단순화한다. rod의 단위/갱신이 검증되었다는 뜻은 아니다. Engine RPM은 Shake 통합/공명 검토 후 보류 권고(최종 채택 미정), Startup/Shutdown·무장은 기존 후보로 남으며 새로 확정하지 않았다. 상세 최신 표는 docs/DCS-TELEMETRY.md의 후속 사용자 결정 절이다. 이전 후보 권고보다 이 결정이 우선한다.
+
+## Explorer 파일 관리 (0.2.1 로컬 빌드)
+
+New File 트리는 effects 자체를 선택 가능한 최상위 항목으로 표시하고 그 하위 폴더만 보여준다. 별도 루트 선택 버튼은 없다. 폴더 선택 시 effects/ 접두사 포함 경로를 표시하며 수기 입력은 접두사 생략도 허용한다. 생성 시 선두 effects/ 하나만 대소문자 무관 제거한 뒤 effects 루트 기준으로 해석하므로 중복 effects 디렉토리를 만들지 않는다. Project Explorer는 대소문자 구분 없는 이름 오름차순으로 고정한다. QFileSystemModel의 비동기 행 순서를 화면에 직접 쓰지 않고 동적 QSortFilterProxyModel로 표시 순서를 관리한다. 기존 타이머/내림차순·오름차순 강제 정렬은 제거한다. 트리 선택/확장은 프록시 인덱스로 변환하고 열기/메뉴/드래그는 FilePathRole의 실제 경로를 사용한다. GUI 검증은 사용자 확인 전이다.
+
+effects 루트 우클릭: New Folder/New Script. 하위 폴더: 생성 두 개와 Rename/Delete. Lua: Rename/Delete. Move To는 제거하고 Explorer 내부 드래그로 Lua/하위 폴더를 다른 effects 폴더에 이동한다. 외부 드롭/루트 이동/파일 위 드롭은 거부한다. File → New File은 Save 위에 두고 effects 루트의 폴더 트리와 상대 파일 경로 입력을 제공한다. 폴더 클릭은 입력의 폴더 부분을 채우며 파일명은 유지한다. 모든 경로 조각을 검사한 뒤 없는 폴더를 생성하고 예제 Lua를 쓴다. 취소 시 생성 없음; 파일 쓰기 실패로 이미 생성한 빈 폴더가 남을 수 있다. 우클릭 생성은 이름 입력을 유지한다. raw JSON 초안 중 파일 변경 금지, .lua 자동 추가, 덮어쓰기/폴더 합치기 금지, effects 밖 이동/자기 하위 이동/링크·junction 경로 변경 금지를 유지한다.
+
+명시적 이름 변경/이동은 효과 UUID와 Global/Specific 설정 및 열린 탭/초안/undo를 유지하고 저장된 구조 경로만 갱신한다. 이름 입력/삭제 확인 중 파일 추적을 보류하며 New File 경로 선택 중에는 정상 추적하되 생성 시 프로젝트를 재확인한다. 외부 파일 변경 추론은 별개다. 삭제는 내용·설정·초안 제거 확인 후 휴지통으로 보내며 실패 시 기본 No인 별도 영구 삭제 확인을 표시한다. Yes에서만 effects 내부 경계·하위 링크를 재검사하고 삭제한다. 부분 실패는 경고하고 파일 추적을 갱신한다. 휴지통 복원은 효과 설정 복원이 아니다. 새 Lua의 진동 호출 예제는 주석이며 기본 출력은 미배정이다.
+
+현재 제품 기준은 사용자 지정 0.2.1이며 DCS는 아직 지원하지 않는다. 이번 작업은 로컬 커밋까지이며 태그·Release는 만들지 않는다. 아래는 사용자 요청으로 정해진 작업 경계이며, 효과 후보나 전송 계약의 구현 승인이 아니다.
+
+- 사용자 정정: 효과 범위/대체안의 선택 전에 입력 제공 범위를 조사한다. 현재는 1단계 후보를 평가하기 위한 입력 조사이며 전달 계약/설치/효과 구현은 시작하지 않는다. 조사 결과는 [DCS-TELEMETRY](docs/DCS-TELEMETRY.md)에 기록한다.
+- 하나의 DCS 프로젝트와 공통 Lua를 목표로 한다. 주 사용 기체는 지원 범위 선택 기준이 아니며, 기체별 조종석 인자 매핑을 필수 기반으로 삼지 않는다. 공통 API 존재와 모든 기체에서의 값 갱신 보장은 구분한다.
+- DCS 원본 입력의 의미를 보존하며 다른 게임과 공통 텔레메트리로 정규화하지 않는다. 효과 판단·재무장·지속 시간·상태는 효과 Lua, 연결·수신·유효성·실행·파형·우선순위·HID는 C++ 책임이다.
+- 기존 init/update/self, 이름 기반 출력, haptic_power 직접 전달, 요청 사양·기한 교체, 물리 모터별 단일 요청 선택을 유지한다. 실제 FFB 명령/힘을 읽거나 방향·저항을 진동으로 재현한다고 가정하지 않는다.
+- Ground Roll/Touchdown은 MSFS 사용감을 목표로 한다. 압축이 없는 Touchdown 대체안, 기체 전체 접지를 바퀴별 출력에 사용하는 방식, Ground Thumps의 가상 이음매 모델은 아직 합의되지 않았다. 무장 출력은 사용자 희망에 따라 Stick을 우선 제안한다.
+- 후보: Ground Roll, Touchdown, Ground Thumps, High AoA, Stall/Buffet, G Load, Airspeed, Engine RPM/Startup/Shutdown, Weapon Release/Launch, Gunfire. 필수 입력이 확인되지 않으면 지원으로 확정하지 않는다. 누락은 unavailable이며 측정된 0으로 채우지 않는다.
+- 1단계 제안: 신뢰 가능한 접지 없이 고도/수직 속도만으로 자동 착륙을 판정하지 않는다. 접지는 있고 압축만 없을 때 고정 펄스 대체를 논의한다. RPM 경계는 시동/정지의 추정임을 구분하고 무장 수량 감소만으로 발사를 단정하지 않는다. 모두 사용자 합의 대기다.
+- 설치 DCS 2.9.31.29434의 공식 Scripts/Export.lua, Sim_ControlAPI, FM 헤더/설정 및 실제 TelemFFB exporter를 대조했다. 공중 여부, shake, 속도/AoA/G, 엔진 RPM, 무장 잔량의 API는 확인됐다. rod 필드는 있으나 공통 압축 의미/범위는 미확정이다. 세부 근거·한계는 DCS-TELEMETRY를 따른다. 실게임 샘플/전 기체 동작 검증은 하지 않았다.
+- 조사 후 제안: 통합 Ground Roll, Airframe Shake, High AoA/G Load/Airspeed/Engine RPM은 공통 API 기반 후보다. Touchdown 첫 압축 상승은 아직 확정 불가하며 통합 고정 펄스는 타협안이다. 시동/정지는 RPM 추정, 무장은 종류별 잔량 감소이며 실제 발사와 비상투하의 완전 구분은 불가하다. 기본 Ground Thumps의 포장/활주로 조건을 충족하는 일반 Export 신호는 확인하지 못했다. 이 제안들은 사용자 합의 전이다.
+- localhost 전달 방식·포트·유효기간, 로더 한 줄의 경로/API, FPS 범위·반영 시점, Update Timing의 중계기 갱신 포함 여부는 미정이다. 기본 20 FPS 및 전용 설정 파일, 기존 exporter 보존은 사용자 요구로 유지한다.
+
 대상 게임은 MSFS 2024 / MSFS 2020 / X-Plane 12 / War Thunder 중 프로젝트별 하나다. 플랫폼은 Windows 10/11 x64, C++20/MSVC, Qt Widgets 6.8.3 동적 링크, Lua 5.4.8 정적 링크다. Stella 소스는 MIT다. Qt 및 Microsoft 구성요소의 라이선스를 MIT로 재지정하지 않는다.
 
 ## 파일

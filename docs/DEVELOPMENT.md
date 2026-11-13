@@ -1,4 +1,6 @@
-# Stella Vibra 내부 개발 기준 (0.2.0)
+# Stella Vibra 내부 개발 기준 (0.2.1)
+
+0.2.1 로컬 빌드(사용자 지정, 태그·Release 없음): Explorer는 이름 입력 후 생성, 이름 변경/삭제, 폴더로 드래그 이동을 지원한다. Move To 메뉴는 제거했다. 앱 내 이동은 UUID·설정·초안·탭을 보존한다. File → New File은 effects 루트 폴더 트리와 상대 파일 경로 입력을 제공하며 없는 하위 폴더를 생성한다. 삭제는 휴지통 우선, 실패 시 별도 기본 No 확인 후 영구 삭제한다. 기본 빌드는 -Deploy로 dist도 갱신한다. 상세는 CONTRACTS와 HANDOFF 최신 기록을 따른다.
 
 <p align="center">
   <img src="../assets/stella-vibra-logo.png" alt="Stella Vibra — yellow star and sky-blue vibration marks" width="720">
@@ -6,7 +8,7 @@
 
 Windows용 Lua 기반 햅틱 효과 편집·실행 도구. 제품 UI는 영어, 협업 문서는 한국어로 작성한다. 첫 MVP의 실행 코드와 Release 빌드가 구현되어 있다. 기존 UI 동작은 사용자가 확인했다. 이번 게임 확장의 GUI·게임 연결·하드웨어 동작은 아직 검증하지 않았다.
 
-이 문서는 기존 한국어 README를 옮긴 내부 개발 기준이며 일부 항목에는 구현 과정의 이력이 포함되어 있다. 사용자용 문서는 ../README.md와 MANUAL.md, 현재 릴리스 범위는 RELEASE-NOTES-0.2.0.md를 따른다. 이전 --ui-check 임시 진단 경로는 0.2.0 릴리스 정리에서 제거했다. 작업 상태는 HANDOFF.md, 작업 순서와 새 채팅 프롬프트는 WORKFLOWS.md, 작업 제한은 AGENTS.md를 따른다. 세부 파일 스키마와 입력 필드는 CONTRACTS.md를 따른다.
+이 문서는 기존 한국어 README를 옮긴 내부 개발 기준이며 일부 항목에는 구현 과정의 이력이 포함되어 있다. 사용자용 문서는 ../README.md와 MANUAL.md, 0.2.0 릴리스 이력은 RELEASE-NOTES-0.2.0.md를 따른다. 이전 --ui-check 임시 진단 경로는 0.2.0 릴리스 정리에서 제거했다. 작업 상태는 HANDOFF.md, 작업 순서와 새 채팅 프롬프트는 WORKFLOWS.md, 작업 제한은 AGENTS.md를 따른다. 세부 파일 스키마와 입력 필드는 CONTRACTS.md를 따른다.
 
 ## 기술과 MVP 범위
 
@@ -379,7 +381,7 @@ Settings → Set Channels에서 Yoke/Stick/Throttle/Rudder의 채널 수를 각�
 
 루트에는 StellaVibra.exe(실행 런처), StellaVibra.pref, README.md, LICENSE를 둔다. bin에 실제 앱·PDB·Qt/MSVC DLL, bin/plugins에 Qt 플러그인, bin/simconnect/MSFS2024 및 MSFS2020에 버전별 공식 클라이언트를 둔다. 문서는 docs, 라이선스 원문은 licenses, 대응 소스는 sources, 기본 Lua는 effects, 진단 로그/덤프는 diagnostics다. 앱 설정·진단·템플릿은 작업 디렉토리가 아닌 이 배포 루트를 기준으로 찾는다. 기존 pref는 같은 위치에서 유지되며 bin 안의 실제 앱을 직접 실행해도 같은 설정을 사용한다. 배포 폴더 전체를 복사하거나 삭제하면 된다. 덤프 분석용으로는 당시 bin/StellaVibra.exe와 bin/StellaVibra.pdb를 보존한다. 폴더 재정리는 SimConnect 공개 재배포 권리 확인 여부를 변경하지 않는다(docs/SIMCONNECT-LICENSING.md 참조).
 
-현재 버전은0.2.0이며 로컬 검증 단계다. DCS 연결은 다음 구현 대상이고 아직 지원하지 않는다. GitHub 연결·푸시·공개 배포는 DCS 연동과 충분한 실기 테스트 후 진행한다. 앱 버전과 프로젝트/pref의 파일 스키마 version1은 별개다.
+현재 버전은 사용자 지정 0.2.1이며 로컬 검증 단계다. DCS 연결은 다음 구현 대상이고 아직 지원하지 않는다. GitHub 연결·푸시·공개 배포는 DCS 연동과 충분한 실기 테스트 후 진행한다. 앱 버전과 프로젝트/pref의 파일 스키마 version1은 별개다.
 
 앱 아이콘은 노란 네 갈래 별·하늘색 진동선·남색 배경이다. 승인된 원본은 assets/stella-vibra.png, Windows 다중 해상도 아이콘은 assets/stella-vibra.ico이며 scripts/make-icon.ps1로 원본에서 다시 생성할 수 있다. 루트 런처/실제 EXE와 Qt 앱 창에 포함하므로 배포 시 별도의 아이콘 파일은 필요 없다.
 

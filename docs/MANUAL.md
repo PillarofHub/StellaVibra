@@ -1,6 +1,6 @@
-# Stella Vibra 0.2.0 User Manual
+# Stella Vibra 0.2.1 User Manual
 
-[README](../README.md) · [Release notes](RELEASE-NOTES-0.2.0.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
+[README](../README.md) · [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
 ## Installation and first launch
 
@@ -16,7 +16,7 @@ With a project open, execution is enabled by default and can start producing vib
 
 A project contains a `.sv` JSON file, an `effects/` directory of Lua files, and an `aircrafts/` directory for aircraft overrides. Copy the entire project directory to move or back it up. Templates copied into a project become independent files: upgrading the app does not overwrite your effects or saved parameters.
 
-The File menu groups New Project, Open Project, Open Recent, and Close Project, followed by Save, Save All, Close File, and Exit.
+The current development build groups New Project, Open Project, Open Recent, and Close Project, followed by New File, Save, Save All, Close File, and Exit. New File shows `effects` as the selectable top-level folder, with its subfolders beneath it. Clicking a folder fills in its path while keeping the typed filename. Both `effects/ground/custom/new_effect.lua` and `ground/custom/new_effect.lua` create the same script; the effects prefix is optional. Names and paths are validated before missing folders and the script are created. Cancel creates nothing; a write failure after folder creation may leave empty folders.
 
 | Action | Shortcut | Behavior |
 | --- | --- | --- |
@@ -31,9 +31,19 @@ The File menu groups New Project, Open Project, Open Recent, and Close Project, 
 
 Undo/Redo applies to text editing; it is not a global parameter-change history. A modified marker clears when the content and settings match the saved state again. Closing a project or the application prompts about unsaved work.
 
+### Creating and organizing effects (development build)
+
+Right-click the `effects/` root for **New Folder...** and **New Script...**. Subfolders also offer **Rename...** and **Delete...**; Lua scripts offer Rename and Delete. These creation commands ask for a name before creating an item. New scripts contain a valid, commented API example with an unassigned output and no active vibration calls. The `.lua` extension is added when omitted.
+
+Drag a Lua file or subfolder onto another folder in the same Explorer to move it. Only folders inside effects are valid destinations; external drops, moving the effects root, moving into a folder's own descendants, overwriting, and merging are not supported. Rename and drag moves preserve effect IDs, global/aircraft settings, open tabs, and unsaved script edits. Linked paths are not managed by these commands. Save or discard raw JSON edits first.
+
+Delete asks for confirmation, moves the file or entire folder to the Recycle Bin, removes its effect settings, and discards its unsaved editor drafts. If recycling fails, a separate confirmation asks whether to permanently delete the item; No is the default. Permanent deletion cannot be undone and refuses folders containing linked paths. A filesystem failure may leave a partially deleted folder and is reported. Restoring a recycled Lua file does not restore its removed project settings. File operations are immediate; editor Undo applies only to text.
+
 ### External file changes
 
 The Project Explorer follows Lua files inside `effects/` and its subdirectories. Each effect and subfolder has an enable checkbox; folder checkboxes toggle their effects together. The top-level effects directory is a container without a checkbox. Effects folders initially open expanded.
+
+The Explorer keeps folders and files sorted by name in ascending order, including after renaming, creating, or moving items.
 
 For an unambiguous move with the same filename, settings follow the file. If both filename and location change, the new effect receives defaults. Missing effects and their settings are removed, not kept in a recovery archive. Avoid simultaneous external moves and unsaved JSON edits; save or discard raw JSON drafts before changing effect settings.
 
@@ -95,7 +105,7 @@ Run only the selected MSFS version. If both versions are running, connection is 
 
 ### X-Plane 12
 
-Use the local simulator's UDP RREF endpoint at `127.0.0.1:49000`. Stella subscribes automatically to its 86-field catalog. A non-default simulator UDP port is not configurable in 0.2.0. The inspector and Lua use original dataref paths and native numeric values. Fast fields are requested at 20 Hz and aircraft information at 1 Hz. Live simulator verification is pending.
+Use the local simulator's UDP RREF endpoint at `127.0.0.1:49000`. Stella subscribes automatically to its 86-field catalog. A non-default simulator UDP port is not configurable in 0.2.1. The inspector and Lua use original dataref paths and native numeric values. Fast fields are requested at 20 Hz and aircraft information at 1 Hz. Live simulator verification is pending.
 
 ### War Thunder
 
@@ -182,4 +192,4 @@ Debug Output is also recorded under `diagnostics/`. Session logs rotate at 2MiB,
 
 Help → README and Help → User Manual display local Markdown in a nonmodal document window. Back/Forward/Home navigate documents; web links open your browser. About shows version and license information. Keep the full package, including docs and logo assets, together.
 
-See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for what has and has not been verified. DCS, remote simulator connections, arbitrary device protocols and a full IDE/debugger are outside this release.
+Version 0.2.1 is a local build without a release tag or published release. Explorer file management GUI checks remain pending. See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for earlier verification history. DCS, remote simulator connections, arbitrary device protocols and a full IDE/debugger are outside this release.

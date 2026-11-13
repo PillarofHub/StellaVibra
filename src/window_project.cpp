@@ -15,7 +15,7 @@ void Window::loadProject(const QString& path) {
     drafts.clear();dirtyEffects.clear();diskHashes.clear();effectDefaults.clear();selectedId.clear();selectedScript.clear();dirty=false;
     refreshing=true;clearTabs();profile->clear();profile->addItem("Global",QString());
     for(auto key:project.aircraft.keys())profile->addItem("Specific Aircraft: "+key,key);refreshing=false;
-    files->setRootPath(QFileInfo(path).absolutePath());tree->setRootIndex(files->index(QFileInfo(path).absolutePath()));tree->setEnabled(true);
+    files->setRootPath(QFileInfo(path).absolutePath());tree->setRootIndex(sortedFiles->mapFromSource(files->index(QFileInfo(path).absolutePath())));tree->setEnabled(true);
     setWindowTitle(project.data["name"].toString()+" — Stella Vibra[*]");setWindowModified(false);
     local["last_project"]=project.path;QJsonArray recent{project.path};
     for(auto v:local["recent_projects"].toArray())if(v.toString()!=project.path && recent.size()<10)recent<<v;
@@ -29,8 +29,8 @@ void Window::loadProject(const QString& path) {
 void Window::expandEffectFolders() {
     auto paths=effectDirectoriesToExpand.values();paths.sort();
     for(const auto& path:paths){auto index=files->index(path);if(!index.isValid())continue;
-        if(files->canFetchMore(index))files->fetchMore(index);tree->expand(index);
-        if(tree->isExpanded(index) || !files->hasChildren(index))effectDirectoriesToExpand.remove(path);
+        if(files->canFetchMore(index))files->fetchMore(index);const auto viewIndex=sortedFiles->mapFromSource(index);tree->expand(viewIndex);
+        if(tree->isExpanded(viewIndex) || !files->hasChildren(index))effectDirectoriesToExpand.remove(path);
     }
 }
 void Window::save() {
@@ -159,7 +159,7 @@ void Window::updateRecent() {
     recentMenu->setEnabled(!recentMenu->actions().isEmpty());
 }
 void Window::syncFiles() {
-    if(project.path.isEmpty() || hasRawDrafts())return;
+    if(project.path.isEmpty() || hasRawDrafts() || fileOperation)return;
     if(!QFileInfo::exists(project.path)){addLog("Project file removed; project closed");closeProject();return;}
     QDir root(QFileInfo(project.path).absolutePath());QStringList found;
     QDirIterator it(root.filePath("effects"),{"*.lua"},QDir::Files|QDir::NoSymLinks,QDirIterator::Subdirectories);

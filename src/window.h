@@ -48,6 +48,7 @@ private:
     QString selectedId,selectedScript,currentAircraft;
     bool refreshing=false,dirty=false;
     EffectFiles* files;
+    QSortFilterProxyModel* sortedFiles;
     QTreeView* tree;
     Editor* editor=nullptr;
     QFormLayout* parameters;
@@ -70,6 +71,11 @@ private:
     QString tabPath(int index) const;
     void removeTab(int index); void clearTabs(); void activateTab(); void updateTabs();
     bool hasRawDrafts() const;
+    bool fileOperation=false;
+    void effectContextMenu(const QPoint& point);
+    void editEffectFile(const QString& operation,const QString& path,const QString& destination=QString());
+    bool canMoveEffect(const QString& source,const QString& destination) const;
+    void newFile();
     void saveRaw(const QStringList& paths);
     void refreshRawTabs();
     void cacheDefaults(const QString& id,const LuaEffect& meta);

@@ -1,5 +1,69 @@
 # Stella Vibra 인수인계
 
+## 최신 작업 — 2026-11-13 정렬 방식 교체 및 0.2.1 로컬 커밋
+
+- 사용자 보고: 아래 이전 작업의 강제 재정렬로는 이름 오름차순 문제가 해결되지 않았다. 이전 기록을 GUI 검증 완료로 해석하지 않는다.
+- 타이머와 내림차순→오름차순 강제 호출을 제거했다. 비동기 QFileSystemModel의 행 순서에 직접 의존하던 트리를 동적 QSortFilterProxyModel로 감싸 대소문자 구분 없는 이름 오름차순으로 표시한다. 폴더와 파일 모두 이름 기준이다.
+- 프로젝트 루트/자동 펼침/생성·이동 후 선택에는 프록시 인덱스를 사용한다. 더블 클릭/메뉴/New File 기본 위치/드래그는 FilePathRole로 경로를 얻는다. 체크박스 setData는 프록시의 원본 모델 전달을 사용한다. 모델·탭 재생성 및 주기적 재정렬은 추가하지 않았다.
+- 사용자 지정 버전 0.2.1로 CMake/README/MANUAL/내부 현재 기준을 갱신했다. 누적 Explorer 파일 관리와 DCS 조사 문서를 한 로컬 커밋에 포함한다. DCS는 여전히 조사/범위 논의 단계이며 지원 구현은 없다. 태그·Release·푸시 금지.
+- 검증: 최종 scripts/build.ps1 -Deploy exit0, 컴파일·링크 및 41개 Lua 구문 검사 통과. Release/dist 런처·앱·PDB·README·MANUAL 해시 일치, 두 EXE 버전 0.2.1 확인. diff --check 통과. GUI·앱·게임·HID·런타임 테스트는 실행하지 않았다. 사용자 확인 필요: 폴더·스크립트를 z→a 및 a→z로 바꾼 직후 위치, 생성/드래그 후 순서, 체크박스·더블 클릭·드래그 대상 경로.
+- 기존 개인 설정·프로젝트·진단을 보존하고 앱을 임의 종료하지 않는다.
+## 최신 작업 — 2026-11-13 New File 루트 표시 및 Explorer 이름 정렬
+
+- New File은 effects를 선택 가능한 최상위 폴더로 표시하고 그 아래 하위 폴더를 보여준다. 별도 Use effects root 버튼은 제거했다. 파일 시스템 모델의 프로젝트 직속 항목을 effects만 남기는 필터를 사용해 프로젝트의 다른 폴더는 보이지 않는다.
+- 폴더 선택 시 effects/ 접두사를 포함해 경로를 채운다. 생성 시 수기 입력의 선두 effects/ 하나를 대소문자 무관하게 정규화하므로 effects/ground/test.lua와 ground/test.lua가 같은 파일을 가리킨다. 기존 이름·경계 검사와 중간 폴더 생성은 유지한다.
+- Explorer는 이름 오름차순을 명시하고 헤더 클릭에 의한 변경을 막는다. 비동기 rowsInserted/rowsRemoved 및 이름 데이터 변경을 모아 큐에서 강제 재정렬해 rename 뒤 끝으로 밀린 항목을 되돌린다. 체크·오류 표시 갱신은 역할을 명시하여 불필요한 재정렬을 피한다. 모델/탭 초기화는 하지 않는다.
+- README/MANUAL/CONTRACTS/WORKFLOWS 반영. 기존 모든 미커밋 변경 보존. DCS 설계/구현 범위와 버전은 변경하지 않았다. 최종 build.ps1 -Deploy exit0, 컴파일·링크/41개 Lua 구문 검사 및 diff --check 통과. Release/dist 런처·실제 앱·PDB·README·MANUAL 해시 일치 확인. GUI·앱·게임·HID·테스트는 실행하지 않았으며 기존 사용자 데이터 삭제/수정 및 커밋/푸시 없음.
+
+## 최신 작업 — 2026-11-13 New File 경로·드래그 이동·삭제 보완
+
+- 사용자 상시 지시: 앞으로 빌드는 -Deploy로 dist도 바로 갱신한다. 공개 배포/버전 확정은 별도다. AGENTS와 WORKFLOWS에 기록했고 이전 dist 미갱신 방침을 대체했다. 기존 설정/프로젝트/진단 보존, 앱 임의 종료 금지는 유지한다.
+- File → New File은 effects 루트 폴더 트리, 상대 script path 입력, Use effects root 버튼을 제공한다. 폴더 클릭 시 파일명은 유지하고 폴더 접두 경로를 채운다. 경로 조각의 이름/예약명/이탈을 확인한 뒤 없는 하위 폴더를 만들고 주석 API 예제 Lua를 생성한다. 잘못된 입력은 대화상자를 유지하며 취소 시 생성하지 않는다. 폴더 생성 후 쓰기 실패는 빈 폴더를 남길 수 있다.
+- 우클릭 New Folder/New Script는 기존 이름 입력 방식을 유지했다. untitled 자동 생성은 불필요한 파일/효과 자동 등록을 늘리므로 도입하지 않았다.
+- Move To 메뉴 제거. EffectTree의 내부 drag/drop으로 Lua/하위 폴더를 effects 안의 폴더에 이동한다. QFileSystemModel의 직접 이동 대신 기존 UUID/설정/탭/초안 보존 로직을 호출한다. 외부 드롭, 파일 위 드롭, 루트/자기 하위/동일 대상/이름 충돌은 거부한다. 한 항목씩 이동한다.
+- 휴지통 이동 실패 시 Permanently Delete 확인(기본 No)을 다시 표시하고 Yes에서만 영구 삭제한다. 실제 삭제 직전 effects 경계와 하위 링크/junction을 재검사한다. 부분 실패는 명시하고 파일 추적을 갱신한다. 이 기능의 실제 파일 삭제/휴지통 실행 검증은 하지 않았다.
+- README/MANUAL/DEVELOPMENT/CONTRACTS를 현재 동작과 일치시켰다. DCS 계획/버전0.2.0은 그대로이며 DCS 구현은 진행하지 않았다.
+- 검증: 최종 scripts/build.ps1 -Deploy exit0, C++ 컴파일·링크 및 기존 41개 Lua 구문 검사 통과. Release/dist 런처·실제 앱·PDB·README·MANUAL 해시 일치, diff --check 통과. 앱·GUI·DCS·HID·테스트 실행·커밋·푸시 없음. 기존 사용자 설정/프로젝트/진단과 Aurora는 변경하지 않았다.
+- 사용자 확인: dist/StellaVibra/StellaVibra.exe → New File에서 폴더 클릭/루트 선택/새 중첩 경로/이름 충돌/취소 → 편집 초안과 기체 설정을 둔 Lua·폴더 드래그 → 휴지통 실패 환경에서 영구 삭제 No/Yes. GUI 동작은 사용자 확인 전이다.
+
+## 최신 배포 — 2026-11-13 Explorer 파일 관리 사용자 확인용
+
+사용자가 dist 빌드를 명시 요청하여 `.\scripts\build.ps1 -Deploy`를 실행했다(exit0). 최신 Explorer/File 메뉴 구현을 dist/StellaVibra에 배포했으며 Release/dist의 루트 런처·실제 앱·PDB 해시 일치를 확인했다. 기존 개인 설정·프로젝트·진단을 삭제하거나 덮어쓰는 작업은 하지 않았다. 앱 종료/실행·게임·HID·테스트 실행·커밋·푸시 없음. 사용자는 dist/StellaVibra/StellaVibra.exe에서 GUI를 확인할 예정이다. 아래 이전 기록의 dist 미갱신 상태는 이번 요청으로 대체된다. DCS 효과 자체는 아직 구현되지 않았다.
+
+## 최신 작업 — 2026-11-13 DCS 효과 정리 및 Explorer 파일 관리
+
+- 이전 문서 변경을 보존했다. 사용자 결정: MSFS와 억지 일치시키지 않는다. Ground Roll/Shake/G Load/선택적 Overspeed 유지, High AoA 및 Ground Thumps 기본 효과 제외. Touchdown은 rod 기반 첫 상승을 먼저 시도하고 사용자 실기 실패 시 통합 출력으로 단순화한다. DCS 코드/연동 구현은 아직 시작하지 않았다.
+- 엔진 검토: P-51D/FW-190D9 FMOptions의 propBodyShakeK/propDisbalanceShakeLim과 공식 EFM head shake 설명을 확인했으나 LoGetShakeAmplitude까지의 통합 호출 경로/모든 엔진 성분 포함은 확인 못했다. TelemFFB 문서의 직접 engine-shake는 IL-2 지원과 구분했다. RPM 선형 합성을 넣지 않고 별도 RPM 효과 보류를 권고한다. 시동/정지·무장 후보의 최종 범위는 미확정이다. 상세는 docs/DCS-TELEMETRY.md 최신 절.
+- UI 구현: src/window_files.cpp 신규, window.cpp/h 및 syncFiles 조정. effects 루트 New Folder/New Script, 하위 폴더에 Rename/Delete/Move To 추가, Lua에 Rename/Delete/Move To. File → New File을 Save 위에 배치했다. New File은 선택 effects 폴더 또는 루트에 Lua를 생성한다.
+- 파일 이름/예약명/확장자 검증, effects 내부 경계 및 canonical 조상 검사, 링크/junction 거부, 덮어쓰기/폴더 합치기/자기 하위 이동 금지. 대소문자만 변경할 때 임시 이름을 거쳐 이동한다. raw JSON 초안 중에는 작업을 막고 모달 작업 동안 자동 파일 추적은 보류한다.
+- 명시적 이동/이름 변경은 UUID·Global/Specific·편집 초안·열린 탭/undo를 유지하고 저장 경로를 갱신한다. 구조 저장 실패 시 파일명 복원을 시도한다(프로젝트 여러 파일 전체 원자 트랜잭션은 기존과 같이 아님). 삭제는 내용·설정·초안 제거 확인 후 QFile::moveToTrash, 실패 시 영구 삭제 없음. 파일 복원과 설정 복원은 별개다.
+- 새 Lua는 init/update/self/Power/output 및 유효성/새 샘플/시간/log/vibrate 주석 예제를 제공한다. 출력 미배정이며 진동 예제 호출은 주석이다. 생성 파일은 즉시 등록·열기, 기존 효과는 변경하지 않는다.
+- 사용자 README/MANUAL은 후속 development build 기능으로 표시했고 내부 DEVELOPMENT/CONTRACTS/WORKFLOWS를 갱신했다. 버전은 0.2.0 유지, 새 버전/릴리스는 미정.
+- 검증: 최종 .\scripts\build.ps1(-Deploy 없음) exit0, C++ 컴파일·링크/기존 41개 Lua 구문 검사 통과. 실제 생성용 문자열을 build/new-script-example.lua로 추출해 LuaCompiler -p exit0. git diff --check 통과. 실행 테스트·GUI·DCS·HID/모터·프로브 없음. dist와 사용자 Export.lua/개인 설정·프로젝트·진단을 변경하지 않았고 앱 종료/커밋/푸시 없음.
+- 사용자 GUI 확인: build/Release/StellaVibra.exe에서 별도 프로젝트로 메뉴 대상별 목록, 예제 생성/이름 충돌/취소, 수정된 스크립트 및 Global/Specific 유지한 폴더·파일 rename/move, 삭제 취소/휴지통, raw JSON 초안 차단을 확인한다. 사용 중인 dist는 이전 버전 그대로다.
+
+## 최신 작업 — 2026-11-13 DCS 공통 입력 조사
+
+- 사용자 정정: 후보 선택보다 제공 입력 조사가 먼저다. 호넷/머스탱/도라를 쓰지만 이 목록을 지원 범위의 기준으로 삼지 않는다. 하나의 DCS 프로젝트/공통 요소를 목표로 한다. 아래 이전 기록의 우선 기체 선택/먼저 범위 합의 요청은 대체되었다.
+- 시작 시 이전 작업의 CONTRACTS/HANDOFF/WORKFLOWS 변경 3개를 보존했다. 코드/사용자 데이터 변경 없음.
+- 읽기 전용으로 설치 `D:\Eagle Dynamics\DCS World`를 발견했고 autoupdate.cfg에서 2.9.31.29434 확인. Scripts/Export.lua, API/Sim_ControlAPI.md, FM 헤더/예제, 설치 모듈 FM Lua, wsTypes를 조사했다. 공식 ED 변경 기록과 TelemFFB exporter도 대조했다.
+- 상세 결과는 docs/DCS-TELEMETRY.md(설계 조사 문서, 세션 일지 아님). API/필드/단위·불확실성·효과 가능성·수집 비용/주기·pause/멀티플레이를 기록했다.
+- 중요 정정: LoGetInAir와 LoGetShakeAmplitude가 공식 참조에 있고 LoGetMechInfo.gear.main의 rod 필드도 있다. 다만 rod 단위/방향/전 기체 갱신은 확인되지 않아 첫 압축 상승 Touchdown은 아직 확정 불가. 외형 인자1/6/4는 사용 사례가 있지만 범용 보장은 아니다. EFM suspension 구조체는 Export 입력이 아니다.
+- 공통 후보: 통합 Ground Roll, Airframe Shake, High AoA, G Load, Airspeed, Engine RPM. Touchdown 통합 고정 펄스, 시동/정지 RPM 추정, 무장 잔량 감소 효과는 의미를 낮추는 타협안이며 미합의다. 무장 종류는 wsTypes로 분류 가능하지만 발사/비상투하/일부 재무장 구분을 해결하지 않는다. 포장/활주로 전용 Ground Thumps의 필수 공통 입력은 찾지 못했다.
+- 다음에는 조사 결과를 근거로 공통 효과 범위와 타협점을 논의한다. 사용자에게 기체 목록이나 미확인 입력을 전제로 선택을 다시 요구하지 않는다. 포트/프로토콜/설치/UI/효과 구현은 아직 시작하지 않는다.
+- 검증: 내부 문서 diff/참조 점검만 수행. 앱·DCS·HID·테스트·빌드·배포·프로브 실행 없음. Saved Games/사용자 Export.lua 및 dist, Aurora 변경 없음. 버전/커밋/푸시/태그/Release/업로드 없음. 문서상 확인과 런타임 검증을 구분한다.
+
+## 최신 작업 — 2026-11-13 DCS 1단계 제안
+
+- 시작 시 git status --short 출력 없음(깨끗한 작업 트리). AGENTS/README/docs/DEVELOPMENT/CONTRACTS/HANDOFF/WORKFLOWS 및 MSFS 지상 효과 Lua를 확인했다. 기준 0.2.0 유지.
+- 사용자 요청은 단계별 논의다. 현재는 효과 후보 제안이며 2–5단계 구현 승인으로 해석하지 않는다. CONTRACTS/WORKFLOWS에 작업 경계와 미확정을 기록했다.
+- MSFS Ground Roll은 Power1/PWM20/80ms, 최소0.1knots, 100ms 갱신 요청이다. Touchdown은 Power40/Constant, 최소200ms/최대2000ms/배수2/최소5knots, 공중 관측 후 재무장과 바퀴별 첫 압축 상승 구간을 사용한다. Ground Thumps는 실제 이음매 센서가 아닌 접지·속도·노면 조건의 가상 슬랩 모델이다.
+- 제안 후보는 지상3종, High AoA·Stall/Buffet·G Load·Airspeed, 엔진 RPM·Startup·Shutdown, 무장 투하/발사·Gunfire다. 입력 보장 전에는 제공 효과로 확정하지 않는다. 접지만 있고 압축이 없을 때 고정 Touchdown 펄스를 허용할지, 기체 전체 접지의 통합 출력을 허용할지, RPM/무장 수량 변화 추정을 어느 범위까지 허용할지, 우선 지원 기체를 사용자와 결정해야 한다.
+- 외부 예비 조회: DCS-ExportScripts Su-25T 원본의 LoGetEngineInfo/LoGetMechInfo 사용 사례를 확인했다. 주석 속 API 목록은 현행 지원 확인으로 취급하지 않았다. 공식/로컬 설치 자료 및 실제 신호·단위·전 기체 가용성 확인은 2단계에 남겼다. 출처는 CONTRACTS에 기록했다.
+- 권장 범위: Ground Roll/Touchdown 우선, High AoA/G Load/Airspeed/Engine RPM은 입력 확인 조건부, 시동·정지·무장은 구분 근거 확인 조건부, Ground Thumps/직접 버핏은 필수 신호 확인 전 보류. 이는 합의 전 제안이다.
+- 다음 응답에서는 사용자 선택을 반영해 1단계 범위를 먼저 확정한다. 입력 조사에서 조건을 충족하지 못하면 축소/대체안을 다시 논의한다. 포트·로더·FPS 범위·갱신 정책·버전은 아직 미정이다.
+- 이번 변경은 내부 문서 3개뿐이다. 제품 기능 미변경으로 README는 유지한다. 앱·DCS·HID·테스트·빌드·배포·커밋·푸시·태그·업로드 없음. dist 및 사용자 Export.lua, Aurora는 건드리지 않았다. 정적 검증은 문서 diff 점검이다.
+
 ## 현재 상태 — 2026-11-10
 
 첫 MVP 커밋 `3e9d4af` 이후 사용자 요청에 따라 IDE식 편집·자동 연결을 구현했다. 직전 IDE 작업 시작 시 트리는 깨끗했으며, 11월 10일 작업에서는 그 미커밋 변경 전체를 보존했다. 이번 후속 변경은 미커밋이며 푸시하지 않았다. Aurora를 변경하지 않았고 하위 에이전트·별도 채팅·앱 실행도 하지 않았다.

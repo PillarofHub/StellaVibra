@@ -8,7 +8,7 @@
 
 Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors. Edit effects, tune their parameters while flying, and route each effect to the motors you want.
 
-**Version 0.2.0** is the current feature-frozen milestone. MSFS 2024 takeoff and landing vibration has been confirmed by the project owner with the earlier working build. The final 0.2.0 package still needs the manual acceptance checks described in the release notes. Other game integrations are implemented but have not been verified in live sessions.
+**Version 0.2.1** adds Explorer file management and New File path selection. This local build has no release tag or published release; GUI acceptance checks are pending. MSFS 2024 takeoff and landing vibration was confirmed by the project owner with an earlier build. Other game integrations have not been verified in live sessions.
 
 [User manual](docs/MANUAL.md) · [0.2.0 release notes](docs/RELEASE-NOTES-0.2.0.md) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
 
@@ -17,6 +17,7 @@ Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors.
 - Creates portable projects containing Lua effects and saved parameters.
 - Connects to the selected simulator and discovers supported HID devices automatically.
 - Provides a tabbed script editor, live parameter controls, effect toggles, motor monitor, telemetry inspector, and debug output.
+- Creates folders and example Lua scripts from the Explorer context menu, and preserves effect settings when renaming or dragging them to another effects folder. The Explorer keeps names sorted. File → New File shows a selectable effects root and accepts script paths with or without the `effects/` prefix, creating missing folders as needed.
 - Supports script defaults, project-wide settings, and per-aircraft overrides.
 - Routes named effect outputs to logical slots and then to physical motors.
 - Produces constant or PWM vibration, with a single winning request per motor.
@@ -30,7 +31,7 @@ Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors.
 | X-Plane 12 | Local UDP RREF | 11 | Live verification pending |
 | War Thunder | Local HTTP telemetry | 8 | Live verification pending |
 
-One project targets one game. DCS is **not supported in 0.2.0**.
+One project targets one game. DCS is **not supported in 0.2.1**.
 
 ## Devices and requirements
 
