@@ -1,16 +1,14 @@
 # Stella Vibra
 
-<p align="center">
-  <img src="assets/stella-vibra-logo.png" alt="Stella Vibra" width="720">
-</p>
+![Stella Vibra](assets/stella-vibra-logo.png)
 
 **Lua-powered haptic effects for flight simulators on Windows.**
 
 Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors. Edit effects, tune their parameters while flying, and route each effect to the motors you want.
 
-**Version 0.2.1** adds Explorer file management and New File path selection. This local build has no release tag or published release. The project owner confirmed Explorer name sorting; other GUI acceptance checks remain pending. MSFS 2024 takeoff and landing vibration was confirmed by the project owner with an earlier build. DCS Ground Roll and P-51 main-gear Touchdown were also reported working; center/tail gear detection remains unconfirmed.
+**Version 0.4.0 adds DCS support**, five DCS default effects, improved project file management, and corrected offline documentation rendering. The project owner confirmed DCS Ground Roll and P-51 main-gear Touchdown, Explorer sorting and the improved help display. See the release notes for verification limits.
 
-[User manual](docs/MANUAL.md) · [0.2.0 release notes](docs/RELEASE-NOTES-0.2.0.md) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
+[User manual](docs/MANUAL.md) · [0.4.0 release notes](docs/RELEASE-NOTES-0.4.0.md) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
 
 ## What it does
 
@@ -34,7 +32,7 @@ Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors.
 
 One project targets one game. DCS projects receive native telemetry through a dedicated exporter. Settings → Set DCS Telemetry automatically discovers profiles and offers Add Scripts, Update Scripts, Restore Scripts and Remove Scripts. It edits only Stella-related lines in the current Export.lua; restoration of modified scripts requires confirmation. The default interval is 50 ms (10–100 ms); edits to the number in config.lua are read back by the dialog. Restart DCS after changes. Remove Scripts also removes Export.lua when no bytes remain. Create a DCS project with Generate default Lua scripts selected to get the five experimental effects. Existing projects are preserved. Touchdown detects each armed gear independently from native rod increases, without a landing-window timeout; missing rods reset that gear and produce no touchdown output. Weapon Release detects cannon-ammunition and same-type station-count decreases, including possible jettison; it cannot identify their cause. Update the installed relay with Update Scripts and restart DCS to collect payload data. See the [manual](docs/MANUAL.md#dcs-default-effects).
 
-Local diagnostic builds include Settings → **Logging** for compact capture of all received telemetry in diagnostics/telemetry. See the [manual](docs/MANUAL.md#temporary-telemetry-logging-local-builds).
+The distribution does not include the temporary Settings → Logging menu or telemetry capture. Normal Debug Output and crash diagnostics remain available.
 
 New Project also accepts a folder name or relative path, resolved beside the portable StellaVibra launcher. DCS default routes: Airframe Shake → Stick and both Throttle slots; G Load → both Throttle slots; Weapon Release Gun/Release → Stick. Existing project copies and overrides are retained.
 
@@ -67,7 +65,7 @@ Settings live in `StellaVibra.pref` beside the root executable. No application p
 
 Stella Vibra's code is licensed under [MIT](LICENSE). Qt, Lua, referenced Aurora Vibra code, Microsoft runtimes, and SimConnect have their own notices and terms.
 
-The Windows package includes unmodified Microsoft SimConnect SDK client DLLs for MSFS connectivity. These components remain the property of Microsoft Corporation and its licensors and are not covered by Stella Vibra's MIT license. Microsoft license terms and third-party notices accompany the package. Stella Vibra is not endorsed or supported by Microsoft. See the [third-party notices](docs/THIRD-PARTY-NOTICES.md) for the distribution policy and [release notes](docs/RELEASE-NOTES-0.2.0.md) for verification status.
+The Windows package includes unmodified Microsoft SimConnect SDK client DLLs for MSFS connectivity. These components remain the property of Microsoft Corporation and its licensors and are not covered by Stella Vibra's MIT license. Microsoft license terms and third-party notices accompany the package. Stella Vibra is not endorsed or supported by Microsoft. See the [third-party notices](docs/THIRD-PARTY-NOTICES.md) for the distribution policy and [release notes](docs/RELEASE-NOTES-0.4.0.md) for verification status.
 
 ## Troubleshooting and reporting
 

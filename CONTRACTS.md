@@ -1,5 +1,20 @@
 # MVP 계약 (형식 1)
 
+## 0.4.0 배포 준비 (2026-11-15)
+
+사용자가 DCS지원 버전을0.4.0으로 확정하고 문서/코드정리·Logging숨김·커밋·dist빌드·ZIP/SHA256생성을 요청했다. CMake/실행파일/사용자문서는0.4.0, 프로젝트/pref schema1·DCSprotocol1/relay2/manifest2는유지한다. README/매뉴얼 표시개선은사용자확인완료.
+
+기본 build.ps1은임시Logging메뉴/수집코드를컴파일제외하고명시적-EnableTelemetryLogging만개발진단을켠다. 기존-WithoutTelemetryLogging옵션은제거. 개발진단코드자체는선택빌드용으로유지,일반Debug Output/크래시진단유지. 공개용package.ps1은Logging OFF설정·현재빌드/배포EXE일치·버전/소스해시를검사하고DCS중계파일/현재릴리스노트를포함한다. 사용자실행폴더와분리된새staging에서허용파일만ZIP화하며pref/프로젝트/진단제외. 기존dist개인파일보존.
+
+사용자요청으로현재변경을로컬커밋하고ZIP/SHA256파일을생성하되태그/푸시/Release생성/외부업로드는하지않는다. 바이너리패키지는사용자가GitHub에업로드한다. 기존확인범위와미검증실기사항은0.4.0릴리스노트에구분한다.
+
+## README·매뉴얼 표시 보정 (2026-11-15)
+
+- 현재 상태는 이미c968525에 커밋되어 있고 시작 작업 트리는clean이었다. 추가 빈 커밋은 만들지 않는다. 사용자 후속 문서 표시 개선은 이번 미커밋 작업으로 남긴다.
+- Qt6.8.3 원본 qtextmarkdownimporter.cpp는 HTML 여는태그/<닫는태그·/> 개수로 htmlTagDepth를 관리한다. README의 표준HTML void `<img>`가 깊이를 남겨 이미지/후속 일반텍스트를 누적하고 출력하지 못하는 경로가 확인된다. README 로고를 표준Markdown 이미지로 교체해 이 경로를 피한다. GitHub도 같은 원본으로 표시한다.
+- 문서브라우저는 기존QTextBrowser의Markdown·상대경로·Back/Forward/Home 동작을 유지한다. 읽기폰트11pt/여백24/제목여백/코드고정폭10pt/표cellpadding7·border1, 이미지최대720px 및 가용폭100% 제한을 적용한다. Qt본문서지원범위이며 GitHub CSS/전체HTML 브라우저와 동일하다고 주장하지 않는다. 별도HTML 복제본·WebEngine 의존성은 추가하지 않는다.
+- GUI·실제화면검증은 사용자 담당, 앱실행/런타임테스트 없음. 기본검증은 컴파일·배포·diff. 버전0.2.1 유지, 태그/Release/푸시 없음.
+
 ## DCS 무장 감소 효과·기본 구성 변경 (2026-11-15)
 
 - 사용자 후속 요청으로 High AoA/Overspeed DCS 번들 제거, weapons/weapon_release.lua 추가. 최종 기본5개는 Ground Roll/Touchdown/Airframe Shake/G Load/Weapon Release. 사용자 프로젝트 복사본은 보존, build/Release·dist의 알려진 두 번들 파일만 배포 시 제거한다. 이전 Landing window 제거와 미커밋 작업을 포함해 요청된 로컬 커밋을 마친다.

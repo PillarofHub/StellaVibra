@@ -1,6 +1,55 @@
 #include "window.h"
 #include "game_catalog.h"
 namespace sv {
+namespace {
+class DocumentationBrowser final : public QTextBrowser {
+public:
+    explicit DocumentationBrowser(QWidget* parent=nullptr):QTextBrowser(parent) {
+        auto textFont=font();textFont.setPointSizeF(11);setFont(textFont);
+        setOpenExternalLinks(true);
+        document()->setDocumentMargin(24);
+        connect(this,&QTextBrowser::sourceChanged,this,[this]{formatDocument();});
+    }
+private:
+    void formatDocument() {
+        auto* doc=document();doc->setDocumentMargin(24);
+        auto codeFont=QFontDatabase::systemFont(QFontDatabase::FixedFont);codeFont.setPointSizeF(10);
+        QSet<QTextTable*> tables;
+        for(auto block=doc->begin();block.isValid();block=block.next()) {
+            QTextCursor cursor(block);
+            if(auto* table=cursor.currentTable())tables.insert(table);
+            auto format=block.blockFormat();
+            if(format.headingLevel()) {
+                format.setTopMargin(18);format.setBottomMargin(10);cursor.setBlockFormat(format);
+            }
+            for(auto it=block.begin();!it.atEnd();++it) {
+                const auto fragment=it.fragment();if(!fragment.isValid())continue;
+                auto character=fragment.charFormat();
+                cursor.setPosition(fragment.position());cursor.setPosition(fragment.position()+fragment.length(),QTextCursor::KeepAnchor);
+                if(character.isImageFormat()) {
+                    auto image=character.toImageFormat();
+                    // Use the document's source URL, so links from docs/ resolve correctly too.
+                    auto resource=doc->resource(QTextDocument::ImageResource,QUrl(image.name()));
+                    QImage bitmap;
+                    if(resource.canConvert<QImage>())bitmap=qvariant_cast<QImage>(resource);
+                    else if(resource.canConvert<QPixmap>())bitmap=qvariant_cast<QPixmap>(resource).toImage();
+                    else if(resource.metaType().id()==QMetaType::QByteArray)bitmap.loadFromData(resource.toByteArray());
+                    if(!bitmap.isNull())image.setWidth(std::min(720,bitmap.width()));
+                    image.setMaximumWidth(QTextLength(QTextLength::PercentageLength,100));
+                    cursor.setCharFormat(image);
+                } else if(character.fontFixedPitch() || format.hasProperty(QTextFormat::BlockCodeLanguage)) {
+                    character.setFont(codeFont);cursor.setCharFormat(character);
+                }
+            }
+        }
+        for(auto* table:tables){
+            auto format=table->format();format.setCellPadding(7);format.setCellSpacing(0);
+            format.setBorder(1);format.setBorderStyle(QTextFrameFormat::BorderStyle_Solid);
+            format.setBorderBrush(palette().color(QPalette::Mid));table->setFormat(format);
+        }
+    }
+};
+}
 void Window::newProject() {
     if(!confirmDiscard())return;
     QDialog dialog(this);dialog.setWindowTitle("New Project");dialog.resize(620,180);QFormLayout form(&dialog);
@@ -102,7 +151,7 @@ void Window::showDocumentation(const QString& relative,const QString& title) {
     auto* layout=new QVBoxLayout(dialog);auto* navigation=new QHBoxLayout;
     auto* back=new QPushButton("Back");auto* forward=new QPushButton("Forward");auto* home=new QPushButton("Home");
     navigation->addWidget(back);navigation->addWidget(forward);navigation->addWidget(home);navigation->addStretch();layout->addLayout(navigation);
-    auto* browser=new QTextBrowser;browser->setOpenExternalLinks(true);layout->addWidget(browser);
+    auto* browser=new DocumentationBrowser;layout->addWidget(browser);
     connect(back,&QPushButton::clicked,browser,&QTextBrowser::backward);connect(forward,&QPushButton::clicked,browser,&QTextBrowser::forward);connect(home,&QPushButton::clicked,browser,&QTextBrowser::home);
     connect(browser,&QTextBrowser::backwardAvailable,back,&QPushButton::setEnabled);connect(browser,&QTextBrowser::forwardAvailable,forward,&QPushButton::setEnabled);back->setEnabled(false);forward->setEnabled(false);
     browser->setSource(QUrl::fromLocalFile(path),QTextDocument::MarkdownResource);

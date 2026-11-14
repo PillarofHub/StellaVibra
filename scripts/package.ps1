@@ -4,11 +4,15 @@ $root = Split-Path $PSScriptRoot -Parent
 $source = Join-Path $root 'dist/StellaVibra'
 $version = [regex]::Match((Get-Content "$root/CMakeLists.txt" -Raw), 'project\(StellaVibra VERSION ([0-9.]+)').Groups[1].Value
 if (!$version) { throw 'Cannot read project version' }
+$cache=Get-Content -LiteralPath "$root/build/CMakeCache.txt" -Raw
+if($cache -notmatch '(?m)^STELLA_TELEMETRY_LOGGING:BOOL=OFF\r?$'){throw 'Distribution requires a default build without -EnableTelemetryLogging'}
 foreach ($exe in @('StellaVibra.exe','bin/StellaVibra.exe')) {
     if ((Get-Item -LiteralPath "$source/$exe").VersionInfo.ProductVersion -ne $version) { throw 'Build/deploy this version first' }
+    if((Get-FileHash -LiteralPath "$root/build/Release/$exe").Hash -ne (Get-FileHash -LiteralPath "$source/$exe").Hash){throw 'Deployed executable differs from the current build'}
 }
 $files = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($p in @('StellaVibra.exe','LICENSE','README.md','assets/stella-vibra-logo.png','docs/MANUAL.md','docs/RELEASE-NOTES-0.2.0.md','docs/THIRD-PARTY-NOTICES.md','bin/StellaVibra.exe','bin/StellaVibra.pdb','bin/qt.conf','sources/qtbase-everywhere-src-6.8.3.tar.xz','sources/lua-5.4.8.tar.gz')) { [void]$files.Add($p) }
+[void]$files.Add("docs/RELEASE-NOTES-$version.md")
 foreach ($file in Get-ChildItem -LiteralPath "$source/bin" -File -Filter '*.dll') { [void]$files.Add("bin/$($file.Name)") }
 foreach ($file in Get-ChildItem -LiteralPath "$source/bin/plugins" -Recurse -File -Filter '*.dll') { [void]$files.Add($file.FullName.Substring($source.TrimEnd('\','/').Length + 1)) }
 foreach ($game in @('MSFS2020','MSFS2024')) {
@@ -17,7 +21,7 @@ foreach ($game in @('MSFS2020','MSFS2024')) {
 [void]$files.Add('bin/simconnect/MSFS2020/MSFS SDK EULA.pdf')
 [void]$files.Add('licenses/MSFS SDK EULA.pdf')
 # Use the repository's template/license list, not arbitrary files added by users.
-foreach ($dir in @('effects','licenses')) {
+foreach ($dir in @('effects','licenses','dcs')) {
     foreach ($file in Get-ChildItem -LiteralPath "$root/$dir" -Recurse -File) { [void]$files.Add($file.FullName.Substring($root.TrimEnd('\','/').Length + 1)) }
 }
 foreach ($relative in $files) {

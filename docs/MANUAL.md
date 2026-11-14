@@ -1,6 +1,6 @@
-# Stella Vibra 0.2.1 User Manual
+# Stella Vibra 0.4.0 User Manual
 
-[README](../README.md) · [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
+[README](../README.md) · [0.4.0 release notes](RELEASE-NOTES-0.4.0.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
 ## Installation and first launch
 
@@ -92,17 +92,9 @@ The Telemetry view and Lua completion expose **telemetry.dcs** with native API n
 
 Automatic profile discovery has been confirmed by the project owner. Installation/removal, exporter coexistence and live DCS reception still require user verification.
 
-## Temporary telemetry logging (local builds)
+## Diagnostics
 
-Settings → **Logging** starts recording and checks the menu item; click again to stop. Each start creates a new JSONL file under **diagnostics/telemetry** in the application folder, with a UTC timestamp and game in the filename. Logging starts off and stops on project change/close or app exit. The Debug Output shows the file path. Existing projects and scripts are not edited.
-
-Capture includes all telemetry currently received by Stella for the selected game, including transport metadata and fields not used by an effect. It does not request additional simulator fields. Each logging start creates a separate file; starting the app alone creates no telemetry capture file.
-
-Each data line is compact JSON: `t` is elapsed milliseconds, `v` is input validity, `f` is a full snapshot, `d` sets values at JSON Pointer paths, and `x` removes paths. The first snapshot and each session/aircraft change use `f`; subsequent lines contain only changes. Arrays are replaced as a whole. Apply each `d` then `x` to reconstruct the current state; `~0` and `~1` escape tilde and slash in path segments. Removed, null and measured zero remain distinct. Numbers retain JSON double precision; repeated unchanged values are omitted. Lines starting with `#` are metadata/comments, including UTC start/stop, game, aircraft, session and final sample count.
-
-Capture uses received samples, not the slower Telemetry view refresh. A bounded memory buffer reports `#dropped` on overflow; the next capture supplies a full snapshot to resume reconstruction, but the lost interval cannot be recovered. Disk errors stop Logging. Files flush once per second and on stop; a crash can lose the final buffered data. No effect scaling is applied.
-
-This diagnostic feature is included in local builds only. The distribution build command is `scripts/build.ps1 -Deploy -WithoutTelemetryLogging`, which omits both the menu and capture code. Default effect changes apply to newly generated scripts; existing project copies and parameter overrides are retained.
+The 0.4.0 distribution excludes the temporary Settings → Logging menu and telemetry capture. Normal Debug Output and crash diagnostics remain available. Existing diagnostic files are not deleted by an update.
 
 ## Relative project paths
 
@@ -127,7 +119,7 @@ Shake maps the configured range to integer output: `round(Power.strength * clamp
 
 Use Settings → Set DCS Telemetry → **Update Scripts**, then restart DCS to install relay v2. The Export.lua loader line, interval configuration and protocol 1 stay unchanged. Missing payload data produces no weapon vibration. Station indices are preserved as string keys, for example `telemetry.dcs.LoGetPayloadInfo.Stations["1"].count`; absent stations are not converted to zero. Cannon and station availability are independent. First samples, invalid input and aircraft/session changes establish a new baseline. Increased counts, new stations or changed types reset comparisons and suppress pulses for 500 ms. Rearming removals can still be ambiguous; a station that disappears or changes type on its last release may be missed deliberately. No airborne restriction is imposed, so ground firing is supported when counts are provided.
 
-The relay queries payload at the configured interval and sends only Cannon.shells and station count/container/type, up to 64 stations. If the payload would exceed 16 KiB it is omitted to preserve flight telemetry. Missing inputs remain unavailable. Payload fields appear in Telemetry and compact Logging; the earlier P-51/Hornet logs predate payload collection and cannot validate this effect. Old High AoA/Overspeed files are removed only from bundled templates; existing user projects keep their copies and can disable/delete them manually.
+The relay queries payload at the configured interval and sends only Cannon.shells and station count/container/type, up to 64 stations. If the payload would exceed 16 KiB it is omitted to preserve flight telemetry. Missing inputs remain unavailable. Payload fields appear in Telemetry; the earlier P-51/Hornet logs predate payload collection and cannot validate this effect. Old High AoA/Overspeed files are removed only from bundled templates; existing user projects keep their copies and can disable/delete them manually.
 
 Rearm ms belongs to **Touchdown**, not Ground Roll. Each gear requires valid rod samples while airborne for Rearm ms (default 200) before accepting a landing. Once armed, each gear waits independently for its first valid rod increase while the aircraft is not in air. There is no Landing window timeout, so delayed center contact is not discarded. That gear consumes its armed state on the first rise and cannot trigger again until airborne rearming. An armed gear that never shows a landing rise can still respond to a later rise; rod is a proxy rather than an independent wheel-contact signal.
 
@@ -171,7 +163,7 @@ Run only the selected MSFS version. If both versions are running, connection is 
 
 ### X-Plane 12
 
-Use the local simulator's UDP RREF endpoint at `127.0.0.1:49000`. Stella subscribes automatically to its 86-field catalog. A non-default simulator UDP port is not configurable in 0.2.1. The inspector and Lua use original dataref paths and native numeric values. Fast fields are requested at 20 Hz and aircraft information at 1 Hz. Live simulator verification is pending.
+Use the local simulator's UDP RREF endpoint at `127.0.0.1:49000`. Stella subscribes automatically to its 86-field catalog. A non-default simulator UDP port is not configurable in 0.4.0. The inspector and Lua use original dataref paths and native numeric values. Fast fields are requested at 20 Hz and aircraft information at 1 Hz. Live simulator verification is pending.
 
 ### War Thunder
 
@@ -256,6 +248,6 @@ Debug Output is also recorded under `diagnostics/`. Session logs rotate at 2MiB,
 
 ## Help and release status
 
-Help → README and Help → User Manual display local Markdown in a nonmodal document window. Back/Forward/Home navigate documents; web links open your browser. About shows version and license information. Keep the full package, including docs and logo assets, together.
+Help → README and Help → User Manual display the same local Markdown sources used on GitHub, in a nonmodal document window. The reader uses readable body text, heading spacing, monospaced code, and padded table cells. Images fit the available document width, with a maximum displayed width of 720 pixels. Back/Forward/Home navigate documents; relative links and images resolve from the current document, and web links open your browser. This is a Qt rich-text reader, not a full web browser or a pixel-identical GitHub page. About shows version and license information. Keep the full package, including docs and logo assets, together.
 
-Version 0.2.1 is a local build without a release tag or published release. DCS default effects require user flight verification. See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for earlier verification history. Remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.
+Version 0.4.0 adds DCS support. The project owner confirmed the improved README/manual display; effect and aircraft limitations remain as described in the [0.4.0 release notes](RELEASE-NOTES-0.4.0.md). Remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.

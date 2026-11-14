@@ -1,4 +1,4 @@
-param([switch]$Deploy, [switch]$Detailed, [switch]$WithoutTelemetryLogging)
+param([switch]$Deploy, [switch]$Detailed, [switch]$EnableTelemetryLogging)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $log = Join-Path $root 'build/build.log'
@@ -8,7 +8,7 @@ $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.e
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { throw 'MSVC Build Tools are required' }
 $cmake = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
-$capture = if($WithoutTelemetryLogging){'OFF'}else{'ON'}
+$capture = if($EnableTelemetryLogging){'ON'}else{'OFF'}
 & $cmake -S $root -B "$root\build" -G 'Visual Studio 18 2026' -A x64 "-DCMAKE_PREFIX_PATH=$root/.deps" "-DSTELLA_TELEMETRY_LOGGING=$capture"
 if ($LASTEXITCODE) { throw 'CMake configure failed' }
 & $cmake --build "$root\build" --config Release -- /m:1 /nr:false /nologo /verbosity:minimal

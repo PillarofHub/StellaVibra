@@ -1,5 +1,24 @@
 # Stella Vibra 인수인계
 
+## 최신 작업 — 2026-11-15 DCS 지원 0.4.0 배포 준비 완료
+
+- 사용자가 개선된 README/매뉴얼 표시를 확인하고 DCS 지원 버전을 0.4.0으로 지정했다. 버전·문서·릴리스 노트를 갱신했으며 기존 문서 뷰 개선도 이번 커밋에 포함한다.
+- 기본 build.ps1은 임시 Logging 메뉴와 수집 코드를 컴파일에서 제외한다. 개발 진단이 필요할 때만 -EnableTelemetryLogging을 사용한다. 이전 -WithoutTelemetryLogging 옵션은 제거했다. 일반 Debug Output/크래시 진단은 유지한다.
+- package.ps1에서 누락됐던 DCS 중계 파일과 현재 릴리스 노트를 포함하도록 수정했다. Logging OFF, 현재 빌드와 dist 실행파일의 버전/해시, 소스 파일 해시를 검사한다. 사용자 실행 폴더 전체가 아니라 허용된 파일만 새 staging에서 압축한다.
+- WORKFLOWS를 현재 배포 절차로 정리했다. 프로젝트/pref schema 1, DCS protocol 1, relay/manifest 2는 유지한다. 이전 기록의 0.2.1 및 미커밋 표기는 당시 상태이며 현재 상태는 이 항목을 따른다.
+- 검증: scripts/build.ps1 -Deploy 성공(C++ 컴파일/링크, Lua 48개 구문 검사), ZIP 132개 파일을 staging과 해시 비교, SHA256 파일 확인. dist 개인 설정/프로젝트/진단 53개는 사전 해시와 일치한다. 앱/DCS/HID/모터 및 런타임 테스트는 실행하지 않았다.
+- Qt 배포 도구는 translations/catalogs.json 및 선택적 dxcompiler.dll/dxil.dll 부재 경고를 출력했다. 빌드는 성공했으며 GUI 확인은 사용자 담당이다.
+- 최종 업로드 대상: dist/packages/5cf40fcd01c24de8a47639dcf531aa01/StellaVibra-0.4.0-windows-x64.zip 및 같은 이름의 .zip.sha256. SHA256: a0a8989b7f2ba1fc4b8f627b70f53e2f5dab8c7f464ccead8c4c8def06f4a638.
+- 요청한 변경은 로컬 커밋한다. 태그·푸시·GitHub Release·외부 업로드는 수행하지 않는다. 사용자가 직접 업로드한다. 패키징 중간 산출물보다 위 최종 경로를 사용한다.
+
+## 최신 작업 — 2026-11-15 README·매뉴얼 표시 개선
+
+- 시작 상태clean, 직전 변경은c968525에 이미 커밋됐다. 사용자의 '이 상태에서 커밋'은 기존커밋으로 충족하며 빈커밋 없음. 후속 표시 개선은 미커밋으로 남긴다.
+- Qt6.8.3 소스 tar의qtextmarkdownimporter.cpp를 정적으로 확인: `<img ...>`가 HTMLtagdepth를 남겨 이미지와 이후일반본문을 accumulator에 잡아두는 경로. README를 `![Stella Vibra](assets/stella-vibra-logo.png)`로 바꿔 혼합HTML을 제거한다. 사용자매뉴얼에는 이HTML 블록이 없었다.
+- DocumentationBrowser(QTextBrowser)로 기존상대링크·이미지·Back/Forward/Home 유지, 본문11pt·여백24·제목간격·고정폭code10pt·표padding7/border1·이미지폭최대720/가용폭100% 적용. 별도HTML 한벌이나WebEngine 추가없이 동일MD를GitHub와공유한다. GitHub와픽셀단위동일하지않음. 새GUI는 직접실행하지않고 사용자확인대상.
+- 버전0.2.1 유지, 사용자프로젝트/pref/로그보존, 앱/DCS/HID/런타임테스트 없음. 커밋/태그/Release/푸시 없음.
+- 검증: 최종 scripts/build.ps1 -Deploy 성공, C++컴파일/링크·Lua48개구문검사·diff --check 통과. 소스/Release/dist README·MANUAL·로고 및 Release/dist 실행파일/PDB 해시 일치. 사용자확인: README 로고/전체본문, 매뉴얼표/코드, 문서간상대링크 및뒤로가기, 좁은창이미지축소.
+
 ## 최신 작업 — 2026-11-15 Weapon Release·중단된 커밋 완료
 
 - 이전 Landing window 제거·폴더 우선 정렬·로그 분석·상대 프로젝트 경로·센터 수정/출력배정 변경은 미커밋 상태로 보존되어 있었다. 사용자 후속 요청으로 함께 커밋한다. High AoA/Overspeed는 DCS기본에서 제거, weapons/weapon_release.lua 추가(최종5개). 사용자 프로젝트의 기존 효과는 건드리지 않는다.

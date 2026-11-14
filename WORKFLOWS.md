@@ -1,61 +1,27 @@
-# 0.2.1 작업 및 릴리스 운영
+# 0.4.0 작업 및 릴리스 운영
 
-## 최신 단위: 중단된 커밋 완료·Weapon Release (2026-11-15)
+## 현재 승인 범위 (2026-11-15)
 
-Landing window 제거는 구현/배포됐으나 커밋 전 중단됐다. 이번 요청은 해당 커밋 완료와 High AoA/Overspeed 기본 제거, 기총·station 수량 감소 기반 weapon_release 추가다. relay v2의 선택 payload 필드·기본 효과·뷰/완성·문서·dist를 갱신한다. 사용자 Export.lua 설치/삭제 및 앱/DCS/HID/테스트 실행은 하지 않는다. 기존 프로젝트·설정·진단 보존, 앞선 미커밋 변경 포함해 로컬 커밋, 태그/Release/푸시 없음.
+사용자가 DCS 지원 버전을0.4.0으로 확정했다. 기존 문서뷰 개선은 사용자 확인 완료다. 버전/문서 정리, Settings Logging 숨김, 로컬 커밋, dist빌드, GitHub에 사용자가 올릴 Windows ZIP/SHA256 생성을 수행한다. Git태그/푸시/GitHubRelease생성/업로드는 요청되지 않았으므로 하지 않는다.
 
-## 최신 단위: Landing window 제거·로컬 커밋 (2026-11-14)
+## 확정 구성
 
-사용자가 Touchdown의 Landing window 제거와 커밋을 요청했다. 각 기어의 공중 재무장→첫 유효 rod 상승→armed 소모로 처리하고 시간 제한/전체 접지 전환 추적은 제거한다. 이전 미커밋 정렬·로그 분석·효과 보정·상대 경로도 보존해 함께 커밋한다. dist 빌드·정적 점검만 수행, 게임/GUI/HID/런타임 테스트 없음. 버전0.2.1, 태그/Release/푸시 없음.
+- DCS 자동 프로필 탐색과 Add/Update/Restore/Remove Scripts, 고정 Export 로더와 relay v2, 별도10–100ms설정(기본50ms), 로컬UDP43891/protocol1, 유효기간500ms.
+- DCS기본5개: Ground Roll, Touchdown, Airframe Shake, G Load, Weapon Release. High AoA/Overspeed제외. Touchdown은센터gear.nose와좌우gear.main,기어별재무장/첫rod상승,Landing window없음.
+- 사용자 확인: Ground Roll·P-51메인기어Touchdown, 자동탐색, Explorer정렬, 개선된README/매뉴얼표시. 센터수정후실기·무장효과·전기체/장치회귀는 미확인. 상세는docs/RELEASE-NOTES-0.4.0.md.
+- 기본빌드는 Logging메뉴/수집코드제외. 개발진단이필요할때만 scripts/build.ps1 -Deploy -EnableTelemetryLogging. 이개발빌드는 package.ps1에서거부한다. 일반Debug Output/크래시진단은유지한다.
 
-## 최신 단위: 효과 보정·High AoA·상대 경로 (2026-11-14)
+## 검증 및 패키징 순서
 
-사용자가 분석 후 필요한 수정을 승인했다. 센터 rod 경로 수정, Shake 스케일 검토·기본 출력 재배정, High AoA 선택 효과 추가, Touchdown 설정 단순화, New Project appRoot 상대 경로 허용. 기존 미커밋 폴더 우선 정렬/분석을 보존한다. 현재 범위는 CONTRACTS 최신 절을 따르며 과거 High AoA 제외/센터 미수정 결정은 대체된다. dist 빌드, 사용자 프로젝트·로그 보존, 테스트/게임 실행과 커밋은 하지 않는다.
+1. AGENTS/README/DEVELOPMENT/HANDOFF/WORKFLOWS와git status확인,기존작업보존.
+2. scripts/build.ps1 -Deploy로버전리소스/C++/Lua구문검사와dist갱신. 앱/DCS/HID/모터/런타임테스트는사용자의별도요청없이실행하지않는다. 실행중앱을임의종료하지않는다.
+3. 문서/버전/빌드설정/diff 및배포해시확인. 사용자dist의pref/프로젝트/진단은보존한다.
+4. 승인된소스변경만선택해로컬커밋. DLL/.deps/build/dist/개인설정/진단은Git에추가하지않는다.
+5. scripts/package.ps1은새 dist/packages/<고유ID>/StellaVibra staging에허용파일만복사하여StellaVibra-0.4.0-windows-x64.zip과.zip.sha256생성. 실제사용자실행폴더통째압축/삭제금지.
+6. ZIP엔트리·필수파일·제외대상·SHA256확인. 앱실행없이패키지파일구조와내용일치만검증한다. HANDOFF갱신,새세션일지금지.
 
-## 최신 단위: 폴더 우선 정렬·두 비행 로그 분석 (2026-11-14)
+패키지에는 DCS relay/기본Lua,사용자영문문서/로고,동일빌드PDB,Qt/Lua런타임·대응소스·라이선스,원본SimConnect두버전/EULA/출처를포함한다. Microsoft재배포허가미확인고지는THIRD-PARTY-NOTICES와SIMCONNECT-LICENSING에유지한다. 공개작업절차는docs/PUBLISHING.md참조.
 
-직전 작업은79840c5에 커밋됐다. 이번 요청은 Explorer 폴더→파일/그룹 내 이름순 변경 및 P-51D·호넷 로그 분석이다. 결과는 docs/DCS-LOG-ANALYSIS.md. 센터 Touchdown 경로 오류와 Shake 스케일 차이를 발견했으나 이번에는 효과 동작을 변경하지 않는다. 빌드·dist 갱신, GUI는 사용자 확인. 커밋/태그/Release/푸시 요청 없음.
+## 문서 및 상태
 
-## 진행 중: DCS 후속 지원 (2026-11-13)
-
-사용자가 정렬 정상 동작과 최신 효과 제안 방향을 승인했다. 사용자는 자동 탐색을 확인했고 실제 설치/제거/송수신 기반 구현을 요청했다. 설치·수신 기반은 커밋1f6432d로 정리했다. 현재 단위는 사용자 요청에 따른 DCS 기본 효과 5개와 MSFS Ground Roll 중앙 출력 회귀 수정이다. 조사 근거로 먼저 구현하고 체감/기체별 동작은 사용자가 확인한다. 대규모 사전 로그 수집은 하지 않는다. 최신 사용자 결정은 공유 Export.lua 원본 백업/전체 복원 제거, 현재 Stella 관련 행만 편집, 수정 파일은 확인 후 Restore, 해시와 관계없이 Remove에서 전용 폴더 전체 삭제다. 고정 로더/별도 설정,50ms 기본·10–100ms,UDP43891/프로토콜1/500ms 유효기간 계약은 docs/DCS-INTEGRATION.md를 따른다. 설치·게임·수신 동작은 사용자 검증 전이며 도구로 실제 사용자 파일 설치/제거하지 않는다. config 숫자 수동 편집은 정상 설정으로 읽고, Remove 후 Export.lua가0바이트면 삭제한다. 버전0.2.1 유지. 이전 누적 DCS 작업은 로컬 커밋 완료. 사용자 후속 요청으로 기본 PWM 변경·Explorer 구조 동기화·임시 Logging까지 포함해 로컬 커밋한다. 태그/Release/푸시는 하지 않는다.
-
-파일 UI 최신 변경: New File에서 effects 루트 자체를 트리 항목으로 선택하고 effects/ 접두사는 입력 시 선택 사항이다. Explorer는 이름 변경/이동/생성 뒤에도 이름 오름차순을 유지한다. GUI 확인은 사용자가 수행한다.
-
-최신 효과 범위는 DCS-TELEMETRY의 후속 사용자 결정 절을 따른다. Thumps/High AoA 기본 효과 제외, rod Touchdown 우선 시도, Shake 중심 및 G/선택 Overspeed 유지. 엔진 RPM은 별도 합성 효과를 서둘러 추가하지 않고 보류 권고다. DCS 구현과 별도로 Explorer/File 메뉴 파일 관리를 구현한다. 사용자 상시 지시에 따라 앞으로 빌드는 기본적으로 build.ps1 -Deploy를 사용해 dist도 즉시 갱신한다. 개인 설정·프로젝트·진단은 보존하며 앱을 임의 종료하지 않는다. 버전 확정/공개 배포와는 별개다.
-
-사용자 요청으로 파일 관리 변경을 0.2.1로 지정하고 로컬 커밋한다. 태그·Release·푸시는 하지 않는다. DCS 구현 버전 확정은 아니다. 사용자 정정에 따라 효과 범위 선택에 앞서 공통 텔레메트리의 제공 여부와 타협점을 조사한다. 현재 결과는 docs/DCS-TELEMETRY.md에 있다. 아래 단계를 한 번에 구현하지 않는다.
-
-1. 후보 평가에 필요한 공식/설치 자료와 실제 구현을 먼저 조사한다. 일반 Export/외형 draw 인자/조종석 인자/기체 전용 신호를 구분한다. 주 사용 기체는 지원 범위의 결정 기준으로 삼지 않는다.
-2. 조사 근거로 효과의 가능성·타협·원본 단위·비용·주기·unavailable 경계를 제시하고 효과 범위와 입력을 합의한다. 공통 프로젝트/Lua를 기준으로 하며, 기체별 분기를 요구하는 기능은 공통 기능으로 확정하지 않는다.
-3. 직접 localhost UDP와 중계 서버의 필요성을 비교하고 전송·시각·순번·세션·만료·pause/종료/재연결 계약을 합의한다.
-4. 안정된 로더 한 줄, 전용 디렉토리와 설정, 콜백 체이닝, 원본 보존 설치/제거, Set DCS Telemetry UI를 설계·구현한다. FPS 범위·반영 시점·중계기 갱신 동작은 먼저 합의한다.
-5. 합의된 DCS 효과와 Target Game, 기본 Lua, Telemetry 뷰·자동완성을 구현한다. 첫 샘플의 가짜 이벤트를 방지하고 100ms 지속 요청과 이벤트 기한을 구분한다.
-
-각 단계의 확정/제안/미확정을 CONTRACTS와 HANDOFF에 구분한다. 새 세션 일지는 만들지 않는다. DCS 설계 검토 자체에 빌드는 필요 없지만 구현 변경을 빌드할 때는 -Deploy로 dist도 갱신한다. 앱 종료, DCS 실행, 사용자 Export.lua 설치/삭제, HID/테스트 실행은 별도 요청 없이 하지 않는다. 커밋·푸시·태그·공개 업로드는 별도 요청 사항이다.
-
-## 현재 기준
-
-사용자용 영문 문서: README.md, docs/MANUAL.md, docs/RELEASE-NOTES-0.2.0.md, docs/THIRD-PARTY-NOTICES.md.
-내부 설계: docs/DEVELOPMENT.md(기존 한국어 README), CONTRACTS.md. 구현 이력·검증 결과: HANDOFF.md. 라이선스 상세 검토: SIMCONNECT-LICENSING.md. AGENTS.md의 작업 규칙을 먼저 따른다.
-
-현재 로컬 빌드 버전은 0.2.1이다. DCS는 아직 구현하지 않았으며 포함하지 않는다. 이전의 “DCS 후에만 버전 고정” 순서는 사용자의 최신 요청으로 대체되었다. GitHub 연결·푸시·공개 업로드는 이번 작업에서 하지 않는다. 공식 SimConnect 클라이언트의 공개 재배포 권리 확인은 별도 미해결 항목이다.
-
-## 변경 및 검증
-
-1. git status와 기준 문서 확인, 사용자 작업 보존.
-2. 필요한 코드/문서만 변경. 임시 레이아웃 --ui-check 경로는 정리했으며 일반 진단 로그/덤프는 유지한다.
-3. `.\scripts\build.ps1 -Deploy`로 C++/리소스 컴파일·링크와 Lua 구문 컴파일, Release/dist 갱신. 요약 출력만 읽고 오류가 있을 때 build/build.log를 확인한다.
-4. diff 점검, 문서 상대경로·배포 해시·버전 리소스 확인. 앱/게임/HID/모터/런타임 테스트는 명시적 요청 없이 실행하지 않는다.
-5. HANDOFF 갱신. 커밋은 현재 작업에서 요청받았을 때만 파일을 선택해 수행하고 푸시하지 않는다.
-
-Help → README/User Manual은 배포 루트의 파일을 QTextBrowser에서 열며 로컬 링크·이미지는 현재 문서 기준으로 찾는다. 초기 파일이 없으면 오류를 보여준다. 별도 브라우저/Markdown 연결 없이 읽을 수 있고 웹 링크는 기본 브라우저로 연다. CMake install에서 README, 사용자 문서, 로고를 함께 배치한다. 한국어 내부 기획/세션 문서는 사용자 배포에 넣지 않는다.
-
-## 공개 릴리스 전 남은 작업
-
-- docs/RELEASE-NOTES-0.2.0.md의 수동 인수 항목을 실제 GUI·게임·장치에서 확인하고 결과를 기록한다. 기존 MSFS2024 이착륙 성공과 최종 패키지 전체 검증을 구분한다.
-- 사용자 결정에 따라 원본 SimConnect DLL을 동봉한다. Microsoft 소유권·EULA·출처를 유지하고 명시적 재배포 허가 미확인은 고지에 남긴다. 이의 제기 시 해당 다운로드를 철회하고 패키징을 재검토한다. 철회가 기존 배포 책임을 소급 제거하지는 않는다.
-- 공개 패키지는 별도 깨끗한 staging에서 만들고 pref/diagnostics/사용자 프로젝트를 제외한다. 기존 사용자 실행 폴더에서 설정을 삭제하거나 통째로 압축하지 않는다.
-- 소스/바이너리 공개 여부·대상 GitHub 저장소·릴리스 업로드는 후속 지시에 따른다. 커밋·푸시는 각 작업의 명시적 요청을 따른다.
-
-패키징: build.ps1 -Deploy 후 scripts/package.ps1로 별도 dist/packages/<고유ID>에 ZIP/SHA-256을 만든다. 사용자 설정·진단·프로젝트를 제외하며 기존 실행 폴더를 삭제하지 않는다. GitHub 절차는 docs/PUBLISHING.md 참조.
+사용자문서는영어,내부기획/협업은한국어. 사용자README/매뉴얼/릴리스노트는현재0.4.0기능과일치시킨다. 이전결정과구현이력은HANDOFF/CONTRACTS의날짜별기록을참조하고최신계약을우선한다. docs/DCS-LOG-ANALYSIS.md는이전두비행로그의분석자료이며무장필드실기검증자료가아니다.
