@@ -5,11 +5,17 @@
 #include <mutex>
 #include <thread>
 #include <memory>
+#ifdef STELLA_TELEMETRY_LOGGING
+#include "telemetry_capture.h"
+#endif
 namespace sv {
 struct Bundle { Project project; QMap<QString,QString> sources; QSet<QString> reloadIds; QJsonObject channelCounts; };
 struct Snapshot { QString sim="Disconnected",aircraft,execution="Stopped"; QList<Motor> motors; QStringList logs; QJsonObject mappings; Telemetry telemetry; bool telemetryConnected=false; };
 class Engine {
 public:
+#ifdef STELLA_TELEMETRY_LOGGING
+    TelemetryCapture capture;
+#endif
     Engine(); ~Engine();
     void apply(Bundle bundle);
     void clearProject();

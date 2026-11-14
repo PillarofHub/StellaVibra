@@ -1,6 +1,6 @@
 # DCS 설치·전송 계약 (프로토콜 1)
 
-2026-11-14. 사용자는 자동 탐색 정상 동작을 확인하고 실제 Add/Update/Remove 및 DCS 프로젝트 수신 구현을 요청했다. 효과 Lua는 이번 구현 범위 밖이다. 아래 값은 이 구현의 계약이며 실게임 검증 결과를 뜻하지 않는다.
+2026-11-14. 사용자는 자동 탐색 정상 동작을 확인하고 실제 Add/Update/Remove 및 DCS 프로젝트 수신 구현을 요청했다. 이후 사용자 요청으로 기본 효과 5개를 추가했다. 효과 계약은 CONTRACTS.md 및 사용자 MANUAL.md를 따른다. 아래 값은 이 구현의 계약이며 실게임 검증 결과를 뜻하지 않는다.
 
 ## 파일과 설치
 
@@ -61,7 +61,7 @@ Remove Scripts는 확인 후 현재 Export.lua의 대상 행과 전용 StellaVib
 
 `telemetry.transport`는 envelope 메타데이터, sample_id/received_ms/aircraft_key/sim_time_advanced는 Stella 호스트 메타데이터다. 누락/호출 오류/nil/비유한 숫자는 키를 생략하여 Lua에서 nil로 보인다. false/0은 그대로 보존한다. 원본 값을 다른 게임 필드로 변환하거나 rod를 검증된 압축 길이라고 표현하지 않는다. Telemetry 뷰와 자동완성은 선택한 원본 경로를 제공한다.
 
-효과가 없는 DCS 프로젝트를 생성/열어도 수신은 동작하도록 연결했다. 기본 효과 생성은 DCS에서 비활성이다. 게임별 효과와 출력 판단을 C++에 추가하지 않았다. 최종 효과 개발은 수신 데이터의 실기 확인 후 별도 단계다.
+효과가 없는 DCS 프로젝트를 생성/열어도 수신은 동작한다. 새 DCS 프로젝트에서 기본 효과 생성을 선택하면 Ground Roll/Touchdown/Airframe Shake/G Load/Overspeed를 복사한다. 게임별 효과와 출력 판단은 Lua에 있으며 C++에 추가하지 않았다. 기존 프로젝트는 덮어쓰지 않는다. 실기 검증은 사용자 담당이다.
 
 ## 확인 범위
 

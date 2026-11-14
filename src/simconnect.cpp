@@ -75,12 +75,19 @@ QList<Telemetry> SimConnect::poll() {
         require(length>=DWORD(40+count*8+256) && u32(12)==1 && u32(20)==1 && u32(24)==0,"Unexpected telemetry packet layout");
         QByteArray payload(bytes+40,count*8+256); if(payload==lastPacket) continue; lastPacket=payload;
         QList<double> values(count); memcpy(values.data(),bytes+40,count*8);
-        Telemetry t; t.game=game; t.sequence=previous.sequence+1; t.received=nowMs(); t.simTime=values[0]; t.speed=values[1]; t.ground=values[2]!=0; t.paused=paused;
+        Telemetry t; t.game=game; t.sequence=previous.sequence+1; t.received=nowMs(); t.paused=paused;
         for(int i=0;i<count;++i){const auto& field=simVariables()[i];t.values[field.key]=!std::isfinite(values[i])?QJsonValue():field.boolean?QJsonValue(values[i]!=0):QJsonValue(values[i]);}
-        for(int i=0;i<9;++i)require(std::isfinite(values[i]),"Invalid required telemetry number");
+        for(const auto& key:QStringList{"sim_time_s","ground_speed_knots","on_ground"})require(!t.values[key].isNull(),"Invalid required telemetry: "+key);
+        t.simTime=t.values["sim_time_s"].toDouble();t.speed=t.values["ground_speed_knots"].toDouble();t.ground=t.values["on_ground"].toBool();
         auto title=QByteArray(bytes+40+count*8,256); int end=title.indexOf('\0'); require(end>0,"Missing aircraft TITLE"); t.aircraft=QString::fromUtf8(title.constData(),end);
         t.advanced=t.simTime>previous.simTime; t.advancedAt=t.advanced?t.received:previous.advancedAt;
-        for(int i=0;i<3;++i) { t.contact[i]=values[3+i]!=0; t.animation[i]=values[6+i]; }
+        // Catalog additions must not shift the derived Lua gear view.
+        for(int i=0;i<3;++i) {
+            const auto contact=t.values["gear_contact_"+QString::number(i)];
+            const auto animation=t.values["gear_animation_"+QString::number(i)];
+            require(contact.isBool() && animation.isDouble(),"Invalid required gear telemetry");
+            t.contact[i]=contact.toBool();t.animation[i]=animation.toDouble();
+        }
         if(!previous.sequence)qInfo().noquote()<<"First SimConnect telemetry:"<<t.aircraft<<"paused"<<t.paused;
         previous=t; result<<t; status=t.paused?"Connected / paused":"Connected";
     }

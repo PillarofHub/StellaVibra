@@ -40,6 +40,9 @@ private:
     void captureDockRatios();
     void applyDockRatios();
     QSet<QString> effectDirectoriesToExpand;
+    QStringList explorerEntries;
+    QSet<QString> explorerLoadedDirectories;
+    void syncExplorerFiles();
     void expandEffectFolders();
     void setTimingsDialog(); void setChannelsDialog(); void aboutDialog();
     void setDcsTelemetryDialog();
@@ -61,6 +64,13 @@ private:
     QListWidget* output;
     QLineEdit* filter;
     QTimer timer;
+#ifdef STELLA_TELEMETRY_LOGGING
+    QAction* loggingAction=nullptr;
+    QFile telemetryLogFile;
+    qint64 nextLogFlush=0;
+    void toggleLogging(bool enabled);
+    void drainTelemetryLog();
+#endif
     void guarded(const std::function<void()>& action);
     void addLog(const QString& message);
     bool confirmDiscard();

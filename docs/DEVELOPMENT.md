@@ -2,7 +2,7 @@
 
 0.2.1 로컬 빌드(사용자 지정, 태그·Release 없음): Explorer는 이름 입력 후 생성, 이름 변경/삭제, 폴더로 드래그 이동을 지원한다. Move To 메뉴는 제거했다. 앱 내 이동은 UUID·설정·초안·탭을 보존한다. File → New File은 effects 루트 폴더 트리와 상대 파일 경로 입력을 제공하며 없는 하위 폴더를 생성한다. 삭제는 휴지통 우선, 실패 시 별도 기본 No 확인 후 영구 삭제한다. 기본 빌드는 -Deploy로 dist도 갱신한다. 상세는 CONTRACTS와 HANDOFF 최신 기록을 따른다.
 
-DCS 설치·수신: 자동 탐색은 사용자 확인 완료. Add/Update/Restore/Remove Scripts는 고정 로더와 전용 Lua/설정을 관리하고 DCS 프로젝트가 로컬 UDP43891을 수신한다. 기본50ms/10–100ms, 변경 후 DCS 재시작. 기본 효과는 아직 없으며 뷰·자동완성만 제공한다. 설치/게임/수신의 실동작은 사용자 확인 전이다. 상세 계약은 DCS-INTEGRATION.md와 CONTRACTS 참조.
+DCS 설치·수신: 자동 탐색은 사용자 확인 완료. Add/Update/Restore/Remove Scripts는 고정 로더와 전용 Lua/설정을 관리하고 DCS 프로젝트가 로컬 UDP43891을 수신한다. 기본50ms/10–100ms, 변경 후 DCS 재시작. 기본 효과5개와 뷰·자동완성을 제공한다. 사용자 P-51 확인: Ground Roll/메인기어 Touchdown 정상, 센터(테일) 감지 미확인. Shake/G Load/Overspeed 기본 PWM은 false. 임시 Logging은 로컬 build.ps1에서 켜며 공개 배포 준비 빌드는 -WithoutTelemetryLogging으로 제외한다. 상세 계약은 DCS-INTEGRATION.md와 CONTRACTS 참조.
 
 <p align="center">
   <img src="../assets/stella-vibra-logo.png" alt="Stella Vibra — yellow star and sky-blue vibration marks" width="720">

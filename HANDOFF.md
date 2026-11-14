@@ -1,5 +1,23 @@
 # Stella Vibra 인수인계
 
+## 최신 작업 — 2026-11-14 실기 피드백·Explorer·텔레메트리 Logging
+
+- 사용자 확인: DCS Ground Roll 양호, P-51 메인기어 Touchdown 정상. 센터(테일) 감지 미확인. Shake가0/1인지 아직 가설이며 원본 기록으로 검토한다. 기본 Shake/G Load/Overspeed Power.pwm=false, 기존 프로젝트 복사본·Override 보존.
+- 새 프로젝트 Explorer 초기 비동기 로딩 전에 펼침 대기가 제거될 수 있는 경로 수정. 프로젝트 로드 시 새 파일 모델, directoryLoaded 후 루트/펼침 처리. 기존1초 Lua 동기화에 폴더/파일 경로 목록 비교 추가, 구조 변경 때 모델 갱신·선택/펼침 복원, 이름순 유지. 내용 편집·초안 보존 로직은 기존 경로 유지. GUI 확인은 사용자 담당.
+- Settings → Logging 체크 토글. 후속 사용자 정정: Shake뿐 아니라 현재 수신하는 모든 텔레메트리/transport를 기록. 앱 시작 시 파일 생성 없음, 로깅 시작마다 diagnostics/telemetry/UTC_game_unique.jsonl 새 파일. 시작/종료UTC·게임·기체·세션 및 t/v/f/d/x 형식 전체+변경분(JSON Pointer), 누락/null/0 구분, 배열 통째 교체, 소수 보존, 끝 표본 수. 수신 루프에서 기록하며 UI 주기/출력 설정과 독립. 최대256KiB 큐→UI 저장,1초flush/정상종료flush, overflow #dropped 후 전체표본으로 재개, 쓰기 오류 중지. 프로젝트 전환/닫기·앱종료 중지, 시작off. 실제 로깅은 실행하지 않았음.
+- 임시 기능 컴파일 스위치 STELLA_TELEMETRY_LOGGING 기본OFF. 로컬 build.ps1은ON, 공개 배포 준비 명령은 -WithoutTelemetryLogging(메뉴·수집 코드 제외). 이번 dist는 사용자 확인용ON으로 갱신한다. 공개 배포는 별도 요청이며 버전0.2.1 유지.
+- 사용자가 이번 커밋을 요청했다. 이전 미커밋 기본 효과5개/MSFS 수신 수정과 이번 피드백/UI/로깅을 함께 선택해 커밋한다. 태그/Release/푸시 없음. GUI·게임·HID·런타임 테스트는 실행하지 않는다.
+- 검증: 로깅 제외 build.ps1 -WithoutTelemetryLogging 컴파일·링크 성공, 전체 텔레메트리로 확장한 최종 build.ps1 -Deploy 성공(Logging ON). Lua48개 구문 검사 및 diff --check 통과. Release/dist 실행파일/PDB/README/MANUAL·DCS Lua 해시 일치, 기존 프로젝트·루트pref 해시 보존 확인. GUI/실제 로그 파일 생성·온오프/실게임은 사용자 확인 대상이다.
+
+## 최신 작업 — 2026-11-14 DCS 기본 효과·MSFS 중앙 접지 회귀 수정
+
+- 사용자 요청에 따라 대규모 사전 로그 수집 대신 기존 조사에 기반한 DCS 기본 Lua 5개를 구현했다. 실기/체감/기체별 반환은 사용자 검증이며, 자료의 존재를 모든 기체의 정상 동작으로 간주하지 않는다.
+- effects/DCS 아래 Ground Roll, rod 첫 상승 Touchdown, Airframe Shake, G Load, 선택 Overspeed. 새 DCS 프로젝트에서 Generate default Lua scripts 활성. 기존 프로젝트는 변경하지 않았다. 기존 DCS 프로젝트에는 번들 effects/DCS의 원하는 Lua를 복사하거나 새 프로젝트로 시작할 수 있다.
+- Ground Roll 전체3슬롯/strength1, Touchdown 기어별3슬롯/40, Shake Stick:1/30, G Load Stick:1/25(Positive2–6G), Overspeed Stick:1/20(Warning enabled 기본false). 정확한 파라미터/제약은 CONTRACTS 및 MANUAL 참조. rod 방향/갱신·Ny 축·shake 크기·세계속도 단위/항모 상대속도는 실기 확인 대상이다. 첫 샘플 가짜 착륙 방지, rod 누락 시 off, 통합 착지 대체 없음. High AoA/Thumps/별도 Stall/RPM·시동정지·무장은 이번 기본 묶음에 없음.
+- dist SampleProject Ground Roll Lua는 MSFS2024 번들과 동일하며 중앙 기본 출력·개인 슬롯 배정도 있었다. 원인은 C++ SimConnect 고정 인덱스: on_any_runway 추가 후 contact[0]가 runway를, 나머지 접지/animation이 이전 필드를 읽었다. simVariables 이름 기반 값 참조로 수정(MSFS2020/2024 공통). SampleProject/개인 설정 편집 없음. 실게임에서 중앙 Ground Roll과 Touchdown을 다시 확인해야 한다.
+- 검증: scripts/build.ps1 -Deploy exit0, C++ 컴파일/링크·48개 Lua 구문 검사 완료. Release/dist 실행파일/PDB/README/MANUAL 및 새5개 Lua 해시 일치. 배포 전후 SampleProject/DCSProject/루트 pref 파일 해시 보존 확인. diff --check 통과. 앱·게임·HID·모터·런타임 테스트는 실행하지 않았다.
+- 버전0.2.1 유지. 이번 작업은 미커밋(이번 요청에 커밋 지시 없음). 이전 설치·수신 작업은1f6432d. 태그/Release/푸시 없음. 사용자 확인 시 효과 간 단일 승자 우선순위 때문에 하나씩 켜고 확인하면 원인 분리가 쉽다.
+
 ## 최신 작업 — 2026-11-14 config 숫자 편집 허용·빈 Export 삭제·커밋
 
 - 사용자 요청: config.lua 숫자만 바꾼 경우 실제 값을 설정 창에 표시하고 해시 손상으로 처리하지 않는다. 파일 전체를 실행 없이 정해진 주석/return 형식으로 파싱하며 LF/CRLF·정수10–100ms 허용. 숫자 외 형식 변경/범위 오류는 Restore. config 값은 manifest의 저장 주기보다 우선한다.

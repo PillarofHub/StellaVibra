@@ -131,6 +131,12 @@ Window::Window() {
     auto* settingsMenu=menuBar()->addMenu("Settings");connect(settingsMenu->addAction("Set Timings..."),&QAction::triggered,this,[this]{guarded([this]{setTimingsDialog();});});
     connect(settingsMenu->addAction("Set Channels..."),&QAction::triggered,this,[this]{guarded([this]{setChannelsDialog();});});
     connect(settingsMenu->addAction("Set DCS Telemetry..."),&QAction::triggered,this,[this]{guarded([this]{setDcsTelemetryDialog();});});
+#ifdef STELLA_TELEMETRY_LOGGING
+    loggingAction=settingsMenu->addAction("Logging");loggingAction->setCheckable(true);
+    connect(loggingAction,&QAction::triggered,this,[this](bool enabled){
+        try{toggleLogging(enabled);}catch(const std::exception& e){loggingAction->setChecked(false);addLog(e.what());QMessageBox::warning(this,"Logging",e.what());}
+    });
+#endif
     auto* help=menuBar()->addMenu("Help");
     connect(help->addAction("README"),&QAction::triggered,this,[this]{guarded([this]{showDocumentation("README.md","Stella Vibra — README");});});
     auto* manual=help->addAction("User Manual");manual->setShortcut(QKeySequence::HelpContents);
@@ -148,7 +154,12 @@ Window::Window() {
     captureLayoutTimer.start();
     connect(&timer,&QTimer::timeout,this,[this]{tick();});timer.start(20);checkDcsTelemetry();addLog("Automatic MSFS and supported HID discovery enabled. Use Stop All to pause output.");QTimer::singleShot(0,this,[this]{auto path=local["last_project"].toString();if(!path.isEmpty() && QFileInfo::exists(path)) {try{loadProject(path);}catch(const std::exception& e){addLog(QString("Last project could not be opened: ")+e.what());closeProject();}}});
 }
-Window::~Window(){engine.stop();}
+Window::~Window(){
+#ifdef STELLA_TELEMETRY_LOGGING
+    toggleLogging(false);
+#endif
+    engine.stop();
+}
 QSize Window::dockSpace() const {
     return {std::max(1,contentsRect().width()),std::max(1,contentsRect().height()-menuBar()->height()-statusBar()->height())};
 }
@@ -242,7 +253,11 @@ void Window::rebuildParameters(){refreshExplorer();enabledButton->setEnabled(!se
         table->setRowHeight(0,height);table->setFixedHeight(table->horizontalHeader()->sizeHint().height()+height+table->horizontalScrollBar()->sizeHint().height()+6);
     }
 }
-void Window::tick(){if(nowMs()>=nextFileScan){nextFileScan=nowMs()+1000;try{syncFiles();}catch(const std::exception& e){addLog(QString("File sync: ")+e.what());}}auto snapshot=engine.snapshot();for(const auto& message:snapshot.logs){addLog(message);if(message.startsWith("ERROR "))for(auto v:project.data["effects"].toArray()){auto e=v.toObject();if(message.contains(e["id"].toString())){auto path=scriptPath(project.path,e["script"].toString()).toLower();files->errors[path]=message;files->refresh(path);}}}local["motors"]=snapshot.mappings;currentAircraft=snapshot.aircraft;if(!currentAircraft.isEmpty() && profile->findData(currentAircraft)<0)profile->addItem("Specific Aircraft: "+currentAircraft,currentAircraft);state->setText(gameLabel(project.data["game"].toString())+": "+snapshot.sim+" | HID: "+QString::number(std::count_if(snapshot.motors.begin(),snapshot.motors.end(),[](const Motor& motor){return motor.connected;}))+" motors connected | Aircraft: "+(currentAircraft.isEmpty()?"Unknown":currentAircraft)+" | "+snapshot.execution);
+void Window::tick(){
+#ifdef STELLA_TELEMETRY_LOGGING
+    drainTelemetryLog();
+#endif
+    if(nowMs()>=nextFileScan){nextFileScan=nowMs()+1000;try{syncFiles();}catch(const std::exception& e){addLog(QString("File sync: ")+e.what());}}auto snapshot=engine.snapshot();for(const auto& message:snapshot.logs){addLog(message);if(message.startsWith("ERROR "))for(auto v:project.data["effects"].toArray()){auto e=v.toObject();if(message.contains(e["id"].toString())){auto path=scriptPath(project.path,e["script"].toString()).toLower();files->errors[path]=message;files->refresh(path);}}}local["motors"]=snapshot.mappings;currentAircraft=snapshot.aircraft;if(!currentAircraft.isEmpty() && profile->findData(currentAircraft)<0)profile->addItem("Specific Aircraft: "+currentAircraft,currentAircraft);state->setText(gameLabel(project.data["game"].toString())+": "+snapshot.sim+" | HID: "+QString::number(std::count_if(snapshot.motors.begin(),snapshot.motors.end(),[](const Motor& motor){return motor.connected;}))+" motors connected | Aircraft: "+(currentAircraft.isEmpty()?"Unknown":currentAircraft)+" | "+snapshot.execution);
     if(nowMs()>=nextTelemetryRefresh){
         nextTelemetryRefresh=nowMs()+100;const auto& t=snapshot.telemetry;const auto game=project.data["game"].toString();
         auto values=t.game==game?telemetryObject(t):QJsonObject{};bool valid=t.game==game && snapshot.telemetryConnected && t.valid(nowMs());

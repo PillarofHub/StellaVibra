@@ -1,8 +1,27 @@
 # MVP 계약 (형식 1)
 
+## 실기 피드백·Explorer·임시 Logging (2026-11-14)
+
+- 사용자 확인: DCS Ground Roll 만족, P-51 메인기어 Touchdown 정상, 센터(테일) 감지는 미확인. Shake가 이진 신호인지는 가설이며 원본 소수를 기록해 판단한다. Shake/G Load/Overspeed 기본 Power.pwm=false로 변경(아래 이전 PWM 기본값보다 우선). 기존 프로젝트 복사본/Override는 덮어쓰지 않는다.
+- Explorer는 프로젝트 로드 시 파일 모델을 새로 만들고 directoryLoaded 후 루트/펼침을 반영한다. 초기 비동기 로딩 전에 펼침 대기 경로를 제거하지 않는다. 1초마다 폴더/파일 경로 목록을 비교해 구조 변경 시 모델을 재구성하고 선택/펼침을 복원한다. 내용만 변경되면 기존 Lua 동기화가 처리하며 편집 초안 보존 규칙은 유지한다. 이름순 정렬 유지, 파일 작업 중 동기화 보류.
+- Settings → Logging은 기본off, 클릭으로 시작/체크·다시 클릭으로 종료. 앱 실행 시 파일 생성 없음, 로깅 시작마다 diagnostics/telemetry/UTC_game_unique.jsonl 생성, 시작/종료 UTC·게임·기체·세션 기록. 프로젝트 전환/닫기·앱 종료 시 중지. 후속 사용자 정정에 따라 Shake만이 아니라 현재 수신하는 모든 게임별 텔레메트리/transport를 기록한다. 새 simulator 입력 수집을 추가하는 범위는 아니다.
+- 데이터는 t=경과ms,v=유효여부,f=전체표본,d=JSON Pointer별 추가/교체,x=삭제경로. 최초/세션·기체 변경 시 전체, 이후 변경분, 배열은 통째로 교체. 누락/null/0 구분, JSON double 정밀도 보존, 반복값 생략. # 행은 메타데이터/종료 표본 수. 원본 수신 표본 단위이며 느린 Telemetry UI나 효과 출력과 독립적이다.
+- 수신 스레드에서는 최대256KiB 큐에만 기록, UI에서 파일 저장 및1초 flush/종료flush. 초과는 #dropped 명시 및 다음 표본 전체 재기록(누락 구간 복원 불가), 쓰기 실패 시 중지/체크 해제. 앱 비정상 종료 때 마지막 버퍼 손실 가능.
+- CMake STELLA_TELEMETRY_LOGGING 기본OFF, 로컬 scripts/build.ps1에서는ON. 배포 준비는 -WithoutTelemetryLogging으로 메뉴·수집 코드 제외. 이번 요청으로 이전 미커밋 DCS 효과/MSFS 수정과 이번 변경을 함께 로컬 커밋한다. 버전0.2.1 유지, 태그/Release/푸시 없음.
+
+## DCS 기본 효과·MSFS 수신 수정 (2026-11-14)
+
+- 사용자 승인 범위: 기존 자료에 기반한 공통 DCS 기본 Lua를 먼저 구현하고 실기에서 보정한다. 대규모 로그 수집/기체별 매핑은 선행 조건이 아니다. Ground Roll, rod 첫 상승 Touchdown, Airframe Shake, G Load, 선택 Overspeed 5개. High AoA/별도 Stall Buffet/Thumps 제외, Engine RPM 보류, 시동/정지·무장은 이번 구현 제외.
+- Ground Roll은 비공중 + 세계 x/z 속도 크기 >0.5(native 단위)에서 Stick:1/Throttle:1/2에 strength1 PWM20/80. 항모 상대 속도가 아니므로 움직이는 갑판에서는 정지해도 발생할 수 있다.
+- Touchdown은 공중에서 rod 표본을200ms 관측해 재무장하고 비공중 전환 후1500ms 내 gear.main.nose/left/right.rod 첫 상승(최소차0.0001)을 감지한다. 첫 상승 구간 sim 시간×2,200–2000ms, strength40 Constant, Center→Stick:1/Left→Throttle:1/Right→Throttle:2. 첫 연결·누락으로 이벤트 생성 금지. rod가 없으면 해당 출력 중지, 통합 펄스 자동 대체 없음. rod 방향/단위/기체별 지원은 실험 가정이며 실제 힘으로 해석하지 않는다.
+- Shake는 원본 진폭0–1을 strength0–30으로 스케일하고 원인 분리/공중 제한 없음. G Load는 공중 Ny(y)2–6에서0–25, Positive 기본/Negative/Both 선택, 음G 기준은 크기다. 모두 Stick:1 PWM20/80. 스케일/문턱/Power는 사용자 조절용 출발값이다. 반올림 강도0은 off로 보내 우선순위 점유를 피한다.
+- Overspeed는 경고 기본false, TAS250m/s/해제여유5 또는 Mach0.85/0.03. Stick:1 strength20 PWM40/160. 자동 기체 제한/실제 버핏 재현이 아니다. 기존 aircraft Override로 조절한다.
+- 지속 효과100ms 갱신, Touchdown 별도 종료 기한.50ms 송신/500ms 유효기간/기본20ms HID 유지, 같은 표본은 유효기간·이벤트 기한을 연장하지 않는다. 유효기간 내 지속 효과는 마지막 입력을 유지할 수 있다. 기존 단일 요청 우선순위/파형/API 유지. 새 프로젝트만 기본 파일을 생성하며 기존 프로젝트/개인 설정은 보존한다.
+- MSFS 회귀: on_any_runway 삽입 뒤 고정 인덱스가 밀려 contact[0]에 runway가 들어가고 나머지 접지/압축도 한 칸씩 어긋났다. 이름 기반 simVariables 값으로 파생 gears를 생성한다. dist SampleProject의 Ground Roll Lua는 번들과 같고 중앙 기본 슬롯/장치 배정도 존재한다. 사용자 프로젝트 편집이나 Lua 대신 C++ 디코딩을 수정한다. MSFS2020/2024 모두 적용, 실제 출력 확인은 사용자 담당이다.
+
 ## DCS 설치·수신 구현 (2026-11-14)
 
-사용자가 자동 탐색 정상 동작을 확인하고 실제 스크립트 설치와 DCS 프로젝트 수신 구현을 요청했다. 이전 UI 한정 범위는 이번 요청으로 대체된다. 효과 Lua는 아직 구현하지 않는다.
+사용자가 자동 탐색 정상 동작을 확인하고 실제 스크립트 설치와 DCS 프로젝트 수신 구현을 요청했다. 이전 UI 한정 범위는 이번 요청으로 대체된다. 후속 사용자 요청으로 공통 입력 기반 기본 효과 5개를 구현한다. 아래 최신 효과 구현 계약이 이전 조사 단계의 미확정 문구보다 우선한다.
 
 상세 계약은 [DCS-INTEGRATION](docs/DCS-INTEGRATION.md)에 있다. Export.lua 고정 로더 한 줄 → Scripts/StellaVibra Telemetry/loader.lua → telemetry.lua 및 별도 config.lua, 설치 소유권/해시 manifest.json. 시작/메뉴에서 정확한 관리 행·파일 해시를 검사하며 Add/Update Script·Remove Script가 실제 동작한다. 로더 없음은 Add Scripts, 정상 로더/해시는 항상 Update Scripts, 수정된 Stella 행·무결성 오류는 확인 후 Restore Scripts. 행 또는 전용 폴더가 있으면 해시 불일치라도 Remove Scripts를 허용한다. 기본50ms/범위10–100ms, DCS 재시작 후 반영한다.
 

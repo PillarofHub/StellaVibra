@@ -106,6 +106,9 @@ void Engine::runtimeLoop() {
                 bool fresh=t.sequence!=telemetry.sequence;
                 bool reset=t.session!=telemetry.session || t.aircraft!=telemetry.aircraft || t.simTime<telemetry.simTime || generation.load()!=localGeneration;
                 telemetry=t; now=nowMs(); bool valid=t.valid(now) && (network?network->connected():sim.connected()); inputDeadline=valid?std::min({t.received+500,t.advancedAt+500,t.sourceDeadline?t.sourceDeadline:t.received+500}):0;
+#ifdef STELLA_TELEMETRY_LOGGING
+                capture.record(t,fresh,valid);
+#endif
                 if(wasValid && !valid) reset=true; wasValid=valid;
                 if(reset) { loggedFirstUpdate=false;localGeneration=generation.load(); { std::lock_guard lock(mutex); requests.clear(); } if(hasActive) effects=instantiate(active,t.aircraft); }
                 { std::lock_guard lock(mutex); aircraftKey=t.aircraft; execution=running?(hasActive?(valid?"Running":"Running / waiting for valid telemetry"):"Waiting for a project"):"Stopped"; }
@@ -125,6 +128,9 @@ void Engine::runtimeLoop() {
                 lastUpdate=now;
             }
         } catch(const std::exception& e) { log(QString("Runtime: ")+e.what()); sim.disconnect(); network.reset(); telemetry={}; inputDeadline=0; ++generation; }
+#ifdef STELLA_TELEMETRY_LOGGING
+        capture.record(telemetry,false,telemetry.valid(nowMs()) && (network?network->connected():sim.connected()));
+#endif
         { std::lock_guard lock(mutex); simStatus=selectedGame.isEmpty()?"No project":network?network->status:sim.status;latestTelemetry=telemetry;telemetryConnected=network?network->connected():sim.connected(); }
         heartbeat=nowMs(); std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }

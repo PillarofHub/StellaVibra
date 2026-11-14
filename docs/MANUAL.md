@@ -84,13 +84,41 @@ The installer keeps loader.lua, telemetry.lua, config.lua and manifest.json unde
 
 Each file is saved atomically, but the installation is not one multi-file transaction. If files change during confirmation, the operation stops. Modified managed files can be repaired through Restore Scripts. UTF-16/32 Export.lua files and linked installation paths are not automatically modified. Do not run another exporter installer simultaneously.
 
-Create or open a project with **Target Game: DCS** to receive telemetry. No DCS default effects are generated yet. Other games keep their own connections. The DCS receiver binds only **127.0.0.1:43891 (UDP)** and closes when you switch games or close the project. A port conflict is reported in Debug Output. No separate server is required.
+Create or open a project with **Target Game: DCS** to receive telemetry. Select **Generate default Lua scripts** when creating a project to include the five effects below. Existing projects are not overwritten; you can copy selected files from the bundled effects/DCS directory into an existing project's effects directory. Other games keep their own connections. The DCS receiver binds only **127.0.0.1:43891 (UDP)** and closes when you switch games or close the project. A port conflict is reported in Debug Output. No separate server is required.
 
 The relay uses DCS frame callbacks, sends at most once per configured interval, and cannot run faster than DCS frames. Packets carry protocol version 1, session, sequence, simulation and send times, pause/export permission state and selected native values. Duplicate, out-of-order, malformed and old packets are ignored. Input expires within 500 ms of sending or simulation-clock progress; replaying a snapshot inside Stella does not renew its lifetime. The first sample after a session/aircraft change or long gap establishes a baseline.
 
 The Telemetry view and Lua completion expose **telemetry.dcs** with native API names, such as **LoGetInAir**, **LoGetShakeAmplitude**, **LoGetAccelerationUnits**, **LoGetMechInfo** and **LoGetEngineInfo.RPM**. **telemetry.transport** holds packet metadata. Missing values are nil, not measured zero. Ownship export restrictions are respected. This does not read force-feedback commands, and gear rod units/behavior remain aircraft-dependent and unverified. Weapon and cockpit-specific signals are not collected in this version.
 
 Automatic profile discovery has been confirmed by the project owner. Installation/removal, exporter coexistence and live DCS reception still require user verification.
+
+## Temporary telemetry logging (local builds)
+
+Settings → **Logging** starts recording and checks the menu item; click again to stop. Each start creates a new JSONL file under **diagnostics/telemetry** in the application folder, with a UTC timestamp and game in the filename. Logging starts off and stops on project change/close or app exit. The Debug Output shows the file path. Existing projects and scripts are not edited.
+
+Capture includes all telemetry currently received by Stella for the selected game, including transport metadata and fields not used by an effect. It does not request additional simulator fields. Each logging start creates a separate file; starting the app alone creates no telemetry capture file.
+
+Each data line is compact JSON: `t` is elapsed milliseconds, `v` is input validity, `f` is a full snapshot, `d` sets values at JSON Pointer paths, and `x` removes paths. The first snapshot and each session/aircraft change use `f`; subsequent lines contain only changes. Arrays are replaced as a whole. Apply each `d` then `x` to reconstruct the current state; `~0` and `~1` escape tilde and slash in path segments. Removed, null and measured zero remain distinct. Numbers retain JSON double precision; repeated unchanged values are omitted. Lines starting with `#` are metadata/comments, including UTC start/stop, game, aircraft, session and final sample count.
+
+Capture uses received samples, not the slower Telemetry view refresh. A bounded memory buffer reports `#dropped` on overflow; the next capture supplies a full snapshot to resume reconstruction, but the lost interval cannot be recovered. Disk errors stop Logging. Files flush once per second and on stop; a crash can lose the final buffered data. No effect scaling is applied.
+
+This diagnostic feature is included in local builds only. The distribution build command is `scripts/build.ps1 -Deploy -WithoutTelemetryLogging`, which omits both the menu and capture code. Default effect changes apply to newly generated scripts; existing project copies and parameter overrides are retained.
+
+## DCS default effects
+
+These are experimental starting settings, not aircraft-certified limits or force feedback. Missing inputs stop the dependent effect; they are never treated as measured zero. All effects use common Export API paths, without aircraft-specific cockpit mappings.
+
+| Script | Input and behavior | Default output / settings |
+| --- | --- | --- |
+| ground/ground_roll.lua | Not in air and horizontal world velocity above Minimum speed. Constant intensity, no simulated runway slabs. World velocity is not carrier-relative. | Stick:1, Throttle:1 and Throttle:2; strength 1, PWM 20/80 ms; minimum speed 0.5 in native velocity units |
+| ground/touchdown.lua | First increase of each gear.main.left/right/nose.rod after airborne rearming and an air-to-ground transition. Rod direction, scale and aircraft support need flight verification. | Center Gear → Stick:1; Left/Right Gear → Throttle:1/2; strength 40 Constant; 200–2000 ms, Time multiplier 2 |
+| aerodynamics/airframe_shake.lua | LoGetShakeAmplitude scaled between Minimum amplitude and Full power amplitude, clamped at Power strength. No artificial separation of engine shake and aerodynamic buffet. | Stick:1; strength 30, Constant; amplitude 0–1 |
+| aerodynamics/g_load.lua | Airborne LoGetAccelerationUnits.y scaled between Start G and Full power G. Direction selects Positive, Negative or Both; negative thresholds use magnitudes. | Stick:1; strength 25, Constant; Positive, 2–6 G |
+| aerodynamics/overspeed.lua | User warning using true airspeed (m/s) or Mach, with hysteresis. This is not an automatic aircraft overspeed limit or a buffet model. | Stick:1; Warning enabled defaults to false; strength 20, Constant; 250 m/s with 5 m/s hysteresis or Mach 0.85 with 0.03 hysteresis |
+
+Touchdown requires valid rod samples while airborne for Rearm ms (default 200). The first rod rise must occur within Landing window ms (default 1500) after the air-to-ground transition and exceed Minimum rod rise (default 0.0001). The first rising segment's simulation-time duration, multiplied by Time multiplier, sets the bounded event duration. Later peaks do not restart that landing. Initial ground samples never trigger a touchdown; missing rods do not produce a fallback pulse. The nose path is named Center Gear and does not guarantee a nosewheel on every aircraft.
+
+Continuous effects renew 100 ms requests while input remains valid. Touchdown retains a separate event deadline. Default transmission is 50 ms, input validity is bounded at 500 ms, and the default HID tick is 20 ms; repeated snapshots do not renew telemetry validity. A brief packet gap can hold the last continuous input until expiry. Effects targeting the same motor compete under the existing single-request priority rules; they are not mixed. Disable competing effects when evaluating individual responses. High AoA, separate stall buffet, ground thumps, engine RPM/start/stop and weapon effects are not supplied in this DCS set.
 
 ## Devices and routing
 
@@ -215,4 +243,4 @@ Debug Output is also recorded under `diagnostics/`. Session logs rotate at 2MiB,
 
 Help → README and Help → User Manual display local Markdown in a nonmodal document window. Back/Forward/Home navigate documents; web links open your browser. About shows version and license information. Keep the full package, including docs and logo assets, together.
 
-Version 0.2.1 is a local build without a release tag or published release. Explorer file management GUI checks remain pending. See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for earlier verification history. DCS default effects, remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.
+Version 0.2.1 is a local build without a release tag or published release. DCS default effects require user flight verification. See the [0.2.0 release notes](RELEASE-NOTES-0.2.0.md) for earlier verification history. Remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.

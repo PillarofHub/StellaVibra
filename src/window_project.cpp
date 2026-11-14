@@ -11,11 +11,15 @@ static void saveSource(const QString& path,const QString& text) {
     auto b=text.toUtf8();require(f.write(b)==b.size() && f.commit(),"Cannot commit script");
 }
 void Window::loadProject(const QString& path) {
-    Project next;next.load(path);engine.clearProject();project=std::move(next);savedProject=project;
+    Project next;next.load(path);
+#ifdef STELLA_TELEMETRY_LOGGING
+    toggleLogging(false);loggingAction->setChecked(false);
+#endif
+    engine.clearProject();project=std::move(next);savedProject=project;
     drafts.clear();dirtyEffects.clear();diskHashes.clear();effectDefaults.clear();selectedId.clear();selectedScript.clear();dirty=false;
     refreshing=true;clearTabs();profile->clear();profile->addItem("Global",QString());
     for(auto key:project.aircraft.keys())profile->addItem("Specific Aircraft: "+key,key);refreshing=false;
-    files->setRootPath(QFileInfo(path).absolutePath());tree->setRootIndex(sortedFiles->mapFromSource(files->index(QFileInfo(path).absolutePath())));tree->setEnabled(true);
+    explorerEntries.clear();syncExplorerFiles();tree->setEnabled(true);
     setWindowTitle(project.data["name"].toString()+" — Stella Vibra[*]");setWindowModified(false);
     local["last_project"]=project.path;QJsonArray recent{project.path};
     for(auto v:local["recent_projects"].toArray())if(v.toString()!=project.path && recent.size()<10)recent<<v;
@@ -28,10 +32,41 @@ void Window::loadProject(const QString& path) {
 }
 void Window::expandEffectFolders() {
     auto paths=effectDirectoriesToExpand.values();paths.sort();
-    for(const auto& path:paths){auto index=files->index(path);if(!index.isValid())continue;
+    for(const auto& path:paths){if(!QFileInfo(path).isDir()){effectDirectoriesToExpand.remove(path);continue;}auto index=files->index(path);if(!index.isValid())continue;
         if(files->canFetchMore(index))files->fetchMore(index);const auto viewIndex=sortedFiles->mapFromSource(index);tree->expand(viewIndex);
-        if(tree->isExpanded(viewIndex) || !files->hasChildren(index))effectDirectoriesToExpand.remove(path);
+        if(explorerLoadedDirectories.contains(path) && viewIndex.isValid() && (tree->isExpanded(viewIndex) || files->rowCount(index)==0))effectDirectoriesToExpand.remove(path);
     }
+}
+void Window::syncExplorerFiles() {
+    if(project.path.isEmpty() || fileOperation)return;
+    const auto root=QFileInfo(project.path).absolutePath();
+    QStringList entries{root};
+    QDirIterator scan(root,QDir::AllEntries|QDir::NoDotAndDotDot|QDir::NoSymLinks,QDirIterator::Subdirectories);
+    while(scan.hasNext()){auto path=scan.next();entries<<path+(scan.fileInfo().isDir()?"/":"");}
+    entries.sort();
+    if(entries==explorerEntries){expandEffectFolders();return;}
+    // A new model discards stale asynchronous directory caches. Only structure
+    // changes rebuild it; content edits retain the existing tree and editor.
+    QString selected=tree->currentIndex().data(QFileSystemModel::FilePathRole).toString();
+    if(!selected.startsWith(root+"/",Qt::CaseInsensitive))selected.clear();
+    for(const auto& entry:explorerEntries)if(entry.endsWith('/')){
+        auto path=entry.chopped(1);if(tree->isExpanded(sortedFiles->mapFromSource(files->index(path))))effectDirectoriesToExpand.insert(path);
+    }
+    explorerEntries=entries;
+    explorerLoadedDirectories.clear();
+    auto* old=files;files=new EffectFiles(this);files->setReadOnly(true);
+    files->toggle=old->toggle;files->checks=old->checks;files->errors=old->errors;files->effectsRoot=old->effectsRoot;
+    sortedFiles->setSourceModel(files);old->disconnect(this);old->deleteLater();
+    connect(files,&QFileSystemModel::directoryLoaded,this,[this,root,selected](const QString& loaded){
+        if(project.path.isEmpty() || QFileInfo(project.path).absolutePath()!=root)return;
+        explorerLoadedDirectories.insert(loaded);
+        const auto rootIndex=sortedFiles->mapFromSource(files->index(root));
+        if(rootIndex.isValid() && tree->rootIndex()!=rootIndex)tree->setRootIndex(rootIndex);
+        expandEffectFolders();
+        if(!tree->currentIndex().isValid() && !selected.isEmpty())tree->setCurrentIndex(sortedFiles->mapFromSource(files->index(selected)));
+    });
+    tree->setRootIndex(sortedFiles->mapFromSource(files->setRootPath(root)));
+    expandEffectFolders();
 }
 void Window::save() {
     require(!project.path.isEmpty() && !selectedScript.isEmpty(),"Select a file to save");if(selectedScript.endsWith(".sv",Qt::CaseInsensitive)){if(drafts.contains(selectedScript))saveRaw({selectedScript});return;}
@@ -147,6 +182,9 @@ void Window::closeFile() {
     dirty=!drafts.isEmpty()||!dirtyEffects.isEmpty();setWindowModified(dirty);activateTab();updateTabs();
 }
 void Window::closeProject() {
+#ifdef STELLA_TELEMETRY_LOGGING
+    toggleLogging(false);loggingAction->setChecked(false);
+#endif
     effectDirectoriesToExpand.clear();
     engine.clearProject();project={};savedProject={};drafts.clear();dirtyEffects.clear();diskHashes.clear();effectDefaults.clear();selectedId.clear();selectedScript.clear();dirty=false;
     refreshing=true;clearTabs();files->checks.clear();files->errors.clear();profile->clear();profile->addItem("Global",QString());
@@ -159,6 +197,7 @@ void Window::updateRecent() {
     recentMenu->setEnabled(!recentMenu->actions().isEmpty());
 }
 void Window::syncFiles() {
+    syncExplorerFiles();
     if(project.path.isEmpty() || hasRawDrafts() || fileOperation)return;
     if(!QFileInfo::exists(project.path)){addLog("Project file removed; project closed");closeProject();return;}
     QDir root(QFileInfo(project.path).absolutePath());QStringList found;
