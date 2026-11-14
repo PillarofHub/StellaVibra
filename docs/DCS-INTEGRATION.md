@@ -25,7 +25,7 @@ loader.lua는 telemetry.lua를 보호 호출한다. 중복 로드 방지는 Lua 
 
 config.lua는 관리 주석/return 형식 전체를 직접 파싱하고 정수10–100 범위만 허용한다. 숫자만 수동 변경하면 손상으로 보지 않고 설정 창에 실제 config 값을 표시한다. LF/CRLF는 허용하며 Lua를 실행하지 않는다. 형식/범위가 틀리면 Restore 대상으로 본다. config.lua의 기존 manifest 해시는 무시하고 새 manifest에는 loader.lua/telemetry.lua 해시만 저장한다. 변경 중 충돌 감지용 fingerprint에는 config의 현재 내용도 포함한다. 반환 코드는 `return { interval_ms = 50 }` 형식이다. 기본50ms, 정수10–100ms. 10ms는 과도한 직렬화 빈도를 제한하는 하한, 100ms는 현재100ms 지속 효과 요청과500ms 입력 만료를 고려한 상한이다. 게임 프레임이 느리면 설정 주기를 달성할 수 없으며 누적 송신을 따라잡기 위해 burst를 보내지 않는다. 100ms는 지속 효과 요청 갱신 여유가 없으므로 기본50ms를 권장한다. 파형 주기/HID 틱과는 별개다.
 
-코드·주기 변경은 DCS 재시작 후 적용한다. 매 프레임 config 파일을 다시 읽거나 로더를 재등록하지 않는다. 코드 버전1/프로토콜1/설치 manifest schema2는 앱 버전0.2.1과 별개다. 구 schema1은 해시/주기를 읽어 호환하며 과거 Export.lua 원본 메타데이터는 무시하고 다음 저장 때 제거한다.
+코드·주기 변경은 DCS 재시작 후 적용한다. 매 프레임 config 파일을 다시 읽거나 로더를 재등록하지 않는다. 코드 버전2/프로토콜1/설치 manifest schema2는 앱 버전0.2.1과 별개다. 구 schema1은 해시/주기를 읽어 호환하며 과거 Export.lua 원본 메타데이터는 무시하고 다음 저장 때 제거한다.
 
 자동 탐색은 Windows Known Folder의 Saved Games를 사용한다. 프로필 하나는 자동 선택, 여러 후보는 발견 목록에서 선택한다. 창은 경로 → 주기(ms) → Add/Update/Restore Scripts → Remove Scripts → Done 순이다. 정상 상태는 툴팁, 조작 불가 오류는 경로 아래에 표시한다.
 
@@ -57,11 +57,11 @@ Remove Scripts는 확인 후 현재 Export.lua의 대상 행과 전용 StellaVib
 
 ## 원본 입력과 Lua 표면
 
-`telemetry.dcs` 아래에 DCS API 이름을 그대로 둔다. `LoGetSelfData`는 Name만, `LoGetMechInfo`는 gear/flaps/speedbrakes, `LoGetEngineInfo`는 RPM만 선택한다. in-air, IAS/TAS/Mach/AoA, G벡터, 세계속도/각속도 벡터, shake, pause/권한/개체ID를 수집한다. payload/기총/조종석 인자/월드 객체는 이번 수신 기반 작업에서 수집하지 않는다.
+`telemetry.dcs` 아래에 DCS API 이름을 그대로 둔다. `LoGetSelfData`는 Name만, `LoGetMechInfo`는 gear/flaps/speedbrakes, `LoGetEngineInfo`는 RPM만 선택한다. in-air, IAS/TAS/Mach/AoA, G벡터, 세계속도/각속도 벡터, shake, pause/권한/개체ID를 수집한다. relay v2에서 LoGetPayloadInfo.Cannon.shells와 Stations의 count/container/weapon.level1..4를 추가한다. station ID는 문자열 JSON키, 최대64개, 노드상한1024, payload포함16KiB초과면payload만생략. 조종석 인자/월드 객체는 수집하지 않는다.
 
 `telemetry.transport`는 envelope 메타데이터, sample_id/received_ms/aircraft_key/sim_time_advanced는 Stella 호스트 메타데이터다. 누락/호출 오류/nil/비유한 숫자는 키를 생략하여 Lua에서 nil로 보인다. false/0은 그대로 보존한다. 원본 값을 다른 게임 필드로 변환하거나 rod를 검증된 압축 길이라고 표현하지 않는다. Telemetry 뷰와 자동완성은 선택한 원본 경로를 제공한다.
 
-효과가 없는 DCS 프로젝트를 생성/열어도 수신은 동작한다. 새 DCS 프로젝트에서 기본 효과 생성을 선택하면 Ground Roll/Touchdown/Airframe Shake/G Load/Overspeed를 복사한다. 게임별 효과와 출력 판단은 Lua에 있으며 C++에 추가하지 않았다. 기존 프로젝트는 덮어쓰지 않는다. 실기 검증은 사용자 담당이다.
+효과가 없는 DCS 프로젝트를 생성/열어도 수신은 동작한다. 새 DCS 프로젝트에서 기본 효과 생성을 선택하면 Ground Roll/Touchdown/Airframe Shake/G Load/Weapon Release를 복사한다. 게임별 효과와 출력 판단은 Lua에 있으며 C++에 추가하지 않았다. 기존 프로젝트는 덮어쓰지 않는다. 실기 검증은 사용자 담당이다.
 
 ## 확인 범위
 

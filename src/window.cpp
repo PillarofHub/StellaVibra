@@ -52,7 +52,7 @@ Window::Window() {
     action("Exit",[this]{close();});
     auto* left=new FlexibleDock("Project Explorer",this);left->setObjectName("Explorer");
     files=new EffectFiles(this);files->setReadOnly(true);
-    sortedFiles=new QSortFilterProxyModel(this);sortedFiles->setSourceModel(files);
+    sortedFiles=new EffectSortModel(this);sortedFiles->setSourceModel(files);
     sortedFiles->setSortCaseSensitivity(Qt::CaseInsensitive);sortedFiles->setDynamicSortFilter(true);
     tree=new EffectTree;tree->setModel(sortedFiles);tree->setItemDelegate(new EffectCheckDelegate(tree));for(int i=1;i<4;++i)tree->hideColumn(i);tree->header()->setSectionResizeMode(0,QHeaderView::ResizeToContents);tree->header()->setStretchLastSection(true);tree->setMinimumSize(0,0);connect(files,&QFileSystemModel::directoryLoaded,this,[this]{expandEffectFolders();});tree->setEnabled(false);left->setWidget(tree);addDockWidget(Qt::LeftDockWidgetArea,left);
     tree->setContextMenuPolicy(Qt::CustomContextMenu);

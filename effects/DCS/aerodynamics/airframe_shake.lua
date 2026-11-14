@@ -4,7 +4,7 @@ function effect:init(context)
     context:parameter {name="Power", type="haptic_power", default={strength=30, pwm=false, on_ms=20, period_ms=80}}
     context:parameter {name="Minimum amplitude", type="float", default=0, min=0, max=10, step=0.01}
     context:parameter {name="Full power amplitude", type="float", default=1, min=0.01, max=10, step=0.01}
-    context:output("Airframe", {"Stick:1"})
+    context:output("Airframe", {"Stick:1", "Throttle:1", "Throttle:2"})
 end
 
 function effect:update(context, telemetry, parameters)
@@ -13,6 +13,7 @@ function effect:update(context, telemetry, parameters)
     local amplitude = (telemetry.dcs or {}).LoGetShakeAmplitude
     if context:input_valid() and type(amplitude) == "number" and amplitude > low then
         -- Native shake has no guaranteed scale or separation into engine/buffet sources.
+        -- Map the configured input range to 0..Power.strength, then round for HID.
         local ratio = math.min(1, (amplitude - low) / (high - low))
         local power = parameters.Power
         local strength = math.floor(power.strength * ratio + 0.5)

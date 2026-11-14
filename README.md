@@ -17,7 +17,7 @@ Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors.
 - Creates portable projects containing Lua effects and saved parameters.
 - Connects to the selected simulator and discovers supported HID devices automatically.
 - Provides a tabbed script editor, live parameter controls, effect toggles, motor monitor, telemetry inspector, and debug output.
-- Creates folders and example Lua scripts from the Explorer context menu, and preserves effect settings when renaming or dragging them to another effects folder. The Explorer keeps names sorted. File → New File shows a selectable effects root and accepts script paths with or without the `effects/` prefix, creating missing folders as needed.
+- Creates folders and example Lua scripts from the Explorer context menu, and preserves effect settings when renaming or dragging them to another effects folder. The Explorer lists folders before files, with names sorted ascending within each group. File → New File shows a selectable effects root and accepts script paths with or without the `effects/` prefix, creating missing folders as needed.
 - Supports script defaults, project-wide settings, and per-aircraft overrides.
 - Routes named effect outputs to logical slots and then to physical motors.
 - Produces constant or PWM vibration, with a single winning request per motor.
@@ -30,11 +30,13 @@ Stella Vibra connects simulator telemetry to supported WINCTRL vibration motors.
 | Microsoft Flight Simulator 2020 | Separate SimConnect client | 11 | Live verification pending |
 | X-Plane 12 | Local UDP RREF | 11 | Live verification pending |
 | War Thunder | Local HTTP telemetry | 8 | Live verification pending |
-| DCS | Local UDP exporter | Ground Roll, Touchdown, Airframe Shake, G Load, optional Overspeed | Ground Roll and P-51 main-gear Touchdown confirmed by owner; center/tail gear pending |
+| DCS | Local UDP exporter | Ground Roll, Touchdown, Airframe Shake, G Load, Weapon Release | Ground Roll and P-51 main-gear Touchdown confirmed by owner; center/tail gear pending |
 
-One project targets one game. DCS projects receive native telemetry through a dedicated exporter. Settings → Set DCS Telemetry automatically discovers profiles and offers Add Scripts, Update Scripts, Restore Scripts and Remove Scripts. It edits only Stella-related lines in the current Export.lua; restoration of modified scripts requires confirmation. The default interval is 50 ms (10–100 ms); edits to the number in config.lua are read back by the dialog. Restart DCS after changes. Remove Scripts also removes Export.lua when no bytes remain. Create a DCS project with Generate default Lua scripts selected to get the five experimental effects. Existing projects are preserved. Touchdown uses native gear rod increases; missing rods produce no touchdown output. Overspeed requires enabling a manually configured warning threshold. See the [manual](docs/MANUAL.md#dcs-default-effects).
+One project targets one game. DCS projects receive native telemetry through a dedicated exporter. Settings → Set DCS Telemetry automatically discovers profiles and offers Add Scripts, Update Scripts, Restore Scripts and Remove Scripts. It edits only Stella-related lines in the current Export.lua; restoration of modified scripts requires confirmation. The default interval is 50 ms (10–100 ms); edits to the number in config.lua are read back by the dialog. Restart DCS after changes. Remove Scripts also removes Export.lua when no bytes remain. Create a DCS project with Generate default Lua scripts selected to get the five experimental effects. Existing projects are preserved. Touchdown detects each armed gear independently from native rod increases, without a landing-window timeout; missing rods reset that gear and produce no touchdown output. Weapon Release detects cannon-ammunition and same-type station-count decreases, including possible jettison; it cannot identify their cause. Update the installed relay with Update Scripts and restart DCS to collect payload data. See the [manual](docs/MANUAL.md#dcs-default-effects).
 
 Local diagnostic builds include Settings → **Logging** for compact capture of all received telemetry in diagnostics/telemetry. See the [manual](docs/MANUAL.md#temporary-telemetry-logging-local-builds).
+
+New Project also accepts a folder name or relative path, resolved beside the portable StellaVibra launcher. DCS default routes: Airframe Shake → Stick and both Throttle slots; G Load → both Throttle slots; Weapon Release Gun/Release → Stick. Existing project copies and overrides are retained.
 
 ## Devices and requirements
 

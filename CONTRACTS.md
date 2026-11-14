@@ -1,5 +1,35 @@
 # MVP 계약 (형식 1)
 
+## DCS 무장 감소 효과·기본 구성 변경 (2026-11-15)
+
+- 사용자 후속 요청으로 High AoA/Overspeed DCS 번들 제거, weapons/weapon_release.lua 추가. 최종 기본5개는 Ground Roll/Touchdown/Airframe Shake/G Load/Weapon Release. 사용자 프로젝트 복사본은 보존, build/Release·dist의 알려진 두 번들 파일만 배포 시 제거한다. 이전 Landing window 제거와 미커밋 작업을 포함해 요청된 로컬 커밋을 마친다.
+- 설치 DCS Scripts/Export.lua766–782행에서 LoGetPayloadInfo.Cannon.shells와 Stations의count/container/weapon.level1..4 확인. 기총과 station 수량 감소는 분리할 수 있지만 발사/투하/제티슨/일부 재무장 제거를 구분하는 이벤트는 아님. 실제 기체별 반환·발사 실기는 미검증.
+- relay v2(앱0.2.1·protocol1·manifest schema2와 별개)에서 설정 주기마다 선택 payload를 수집. 숫자 station ID는 JSON 문자열 키로 보존, 최대64개. JSON 노드 상한256→1024,16KiB 패킷 상한 유지. payload 때문에16KiB 초과 시 payload만 생략, 일반 비행 입력 전송 유지. 수신기·로그는 기존 원본 데이터 경로 사용. 설치된 중계기는 사용자가 Update Scripts/DCS재시작으로 갱신한다. Export 로더 한 줄·loader.lua·config.lua 불변, 실제 사용자 설치파일은 도구로 수정하지 않는다.
+- 효과는 Power40 Constant, Gun80ms/Release150ms, 둘 다Stick:1 기본. 기총은 잔탄 감소, Release는 동일 station/type/container의 수량 감소만 감지한다. 한 표본의 여러 감소는 출력당1펄스, 후속 감소는 종료기한 교체(누적 합산 없음). 같은 모터의 기존 단일 승자 규칙 유지.
+- 첫 표본/유효성 상실/세션·기체 변경/누락 후 복구는 baseline. 수량 증가·새station·종류 변경은 baseline 갱신+500ms 억제. 누락/소멸은0으로 대입하지 않아 마지막 무장 방출 때 station 소멸/종류 변경으로만 알려주는 기체는 이벤트를 놓칠 수 있다. 같은 종류 제거형 재무장은 여전히 오검출 가능. 지상 사격 허용(airborne조건 없음). 효과 판단/상태는Lua에만 둔다.
+- Telemetry/자동완성에Cannon.shells/Stations 입력 추가, 이전 센터rod 자동완성 경로도gear.nose.rod로 정정. 무장 입력이 없는 기존relay와도 비행효과는 동작하며 Weapon Release는off. 버전0.2.1, 태그/Release/푸시 없음.
+
+## Touchdown 기어별 감지·Landing window 제거 (2026-11-14)
+
+사용자 후속 승인으로 Landing window ms 파라미터와 landing_until/previous_air 및 만료 분기를 제거한다. 각 기어는 유효한 공중 rod 표본을 Rearm ms 동안 관측한 뒤 재무장하고, 비공중 상태에서 첫 유효 rod 상승을 시간 제한 없이 기다린다. 첫 상승 시 해당 기어의 armed를 소모하며 다음 공중 재무장 전에는 재발생하지 않는다. 늦은 센터 접지에 고정 시간 제한을 두지 않는다. 첫 연결/입력 누락/유효성 상실 방지 및 첫 상승 구간 기반 이벤트 기한은 유지한다. 기어별 접지 입력이 생기는 것은 아니며 착지 상승을 전혀 보이지 않은 기어의 뒤늦은 rod 상승을 구분하는 한계는 남는다.
+
+이전 Landing window 유지 결정은 이 승인으로 대체한다. 사용자 프로젝트는 보존하며 기존 Landing window ms Override는 스크립트 갱신 시 unresolved로 남을 수 있다. 이번 요청으로 미커밋 정렬/분석/효과 보정/상대 경로와 이번 변경을 함께 로컬 커밋한다. 버전0.2.1 유지, 태그/Release/푸시 없음.
+
+## 실측 후 효과 보정·상대 프로젝트 경로 (2026-11-14)
+
+- 후속 사용자 승인으로 센터 Touchdown 조회를 gear.nose.rod로 수정. 좌우는 gear.main.left/right.rod 유지. 첫 상승/누락/첫 연결 억제와 독립 종료 기한은 유지한다.
+- Landing window/Rearm은 Ground Roll이 아니라 Touchdown 설정이다.200ms 공중 재무장 대기는 짧은 공중 전환 억제,1500ms 착지 창은 늦은 센터 접지 허용 및 이후 활주 중 오작동 방지. 두 설정 유지. Minimum rod rise 사용자 파라미터는 제거하고1e-6 내부 수치 허용오차로 단순화. 기록의 양수 증가 중 호넷 좌/우32/41개가1e-6 이하였고 P-51은0개였다. 이것을 물리 하중/압축 문턱으로 해석하지 않는다. 기존 프로젝트에 남은 해당 Override는 unresolved로 표시될 수 있다.
+- Shake 변환 확인: round(Power.strength×clamp((raw-low)/(high-low),0,1)), 이후 C++0–255 정수 검증/단일 요청 선택/HID바이트 전달. 기본 범위0–1/Power30 유지. 임의로 작은 호넷 값을 증폭하지 않는다. 기본 출력은 Shake Stick:1+Throttle:1/2, G Load Throttle:1/2, Overspeed Stick:1.
+- High AoA를 선택 효과로 추가하며 이전 제외 결정을 이 요청으로 변경한다. 공중·유효 원본 LoGetAngleOfAttack, 수동 Start10/Full20/Power20 Constant/Stick:1, Warning enabled 기본false. 설치 Export.lua454행은rad라 적지만 이번 로그는 그 해석과 불일치하므로 degrees/radians 변환 없이 원본 문턱으로 비교한다. 실제 버핏·실속 판정/조종석 AoA units가 아니다. 기체별 기준은 기존 Override로 조절한다.
+- New Project 상대 경로는 현재 작업 디렉토리가 아닌 portable launcher의 appRoot 기준. Hornet/.\Hornet/Projects\Hornet 허용, 실제 내부bin 폴더가 기준은 아님. Browse 초기 위치도 같은 기준. 빈 입력/drive-relative C:Projects는 거부, 절대 경로/비어있지 않은 대상 덮어쓰기 확인 유지. 실제 사용자 프로젝트는 생성하지 않고 컴파일만 검증한다.
+- 기존 미커밋 정렬/로그 분석 보존. 기본 Lua는 번들·새 프로젝트에만 반영하며 사용자 프로젝트/설정/로그는 덮어쓰지 않는다. 버전0.2.1, 커밋/태그/Release/푸시 요청 없음.
+
+## Explorer 폴더 우선·로그 실측 (2026-11-14)
+
+- Explorer는 폴더→파일 순서, 각 그룹은 대소문자 구분 없는 이름 오름차순으로 고정한다. 기존 동적 프록시의 비교 함수만 확장하며 구조 갱신/초안 보존은 유지한다.
+- 사용자 제공 두 로그 분석은 docs/DCS-LOG-ANALYSIS.md 참조. P-51D/호넷 Shake 모두 연속 소수, 관측 최대0.2610/1.0443e-5. 로깅/수신 구간 내 누락 증거 없음. 호넷 공중true는 약0.33초뿐이라 충분한 비행 조건으로 일반화하지 않는다.
+- 확인된 센터 입력 경로는 gear.nose.rod이며 기존 효과의 gear.main.nose 조회는 오류다. 이번 요청 범위는 정렬과 분석으로, Touchdown 수정·Shake 감도 변경·신규 효과는 후속 작업으로 남긴다. 다른 기체에 대한 일반화는 하지 않는다. 이번 커밋 요청 없음.
+
 ## 실기 피드백·Explorer·임시 Logging (2026-11-14)
 
 - 사용자 확인: DCS Ground Roll 만족, P-51 메인기어 Touchdown 정상, 센터(테일) 감지는 미확인. Shake가 이진 신호인지는 가설이며 원본 소수를 기록해 판단한다. Shake/G Load/Overspeed 기본 Power.pwm=false로 변경(아래 이전 PWM 기본값보다 우선). 기존 프로젝트 복사본/Override는 덮어쓰지 않는다.

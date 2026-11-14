@@ -4,7 +4,7 @@ namespace sv {
 void Window::newProject() {
     if(!confirmDiscard())return;
     QDialog dialog(this);dialog.setWindowTitle("New Project");dialog.resize(620,180);QFormLayout form(&dialog);
-    QWidget location;QHBoxLayout row(&location);row.setContentsMargins(0,0,0,0);QLineEdit directory;QPushButton browse("Browse...");row.addWidget(&directory,1);row.addWidget(&browse);form.addRow("Project Directory",&location);
+    QWidget location;QHBoxLayout row(&location);row.setContentsMargins(0,0,0,0);QLineEdit directory;directory.setPlaceholderText("Folder name or full path");directory.setToolTip("Relative paths start in "+QDir::toNativeSeparators(appRoot()));QPushButton browse("Browse...");row.addWidget(&directory,1);row.addWidget(&browse);form.addRow("Project Directory",&location);
     QWidget games;QVBoxLayout gameLayout(&games);gameLayout.setContentsMargins(0,0,0,0);QButtonGroup gameGroup;const auto choices=targetGames();for(int i=0;i<choices.size();++i){auto* button=new QRadioButton(gameLabel(choices[i]));gameLayout.addWidget(button);gameGroup.addButton(button,i);if(!i)button->setChecked(true);}form.addRow("Target Game",&games);QCheckBox generate("Generate default Lua scripts");generate.setChecked(true);form.addRow(&generate);
 
     QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);form.addRow(&buttons);
@@ -14,6 +14,7 @@ void Window::newProject() {
         QDialog picker(&dialog);picker.setWindowTitle("Project Directory");picker.resize(640,480);QVBoxLayout layout(&picker);
         auto initial=QDir::fromNativeSeparators(directory.text().trimmed());
         if(initial.isEmpty())initial=appRoot();
+        else if(QDir::isRelativePath(initial))initial=QDir(appRoot()).absoluteFilePath(initial);
         auto base=QFileInfo(initial).absoluteFilePath();
         while(!QFileInfo(base).isDir()){auto parent=QFileInfo(base).absolutePath();if(parent==base){base=appRoot();break;}base=parent;}
         QLineEdit path(initial);layout.addWidget(new QLabel("Directory path",&picker));layout.addWidget(&path);
@@ -34,11 +35,13 @@ void Window::newProject() {
         picker.exec();
     });
     connect(&buttons,&QDialogButtonBox::accepted,&dialog,[&]{
-        auto path=QDir::cleanPath(QDir::fromNativeSeparators(directory.text().trimmed()));
-        if(path.isEmpty() || !QFileInfo(path).isAbsolute() || QFileInfo(path).fileName().isEmpty() || (QFileInfo::exists(path) && !QFileInfo(path).isDir())){QMessageBox::warning(&dialog,"Project Directory","Enter an absolute directory path. A missing directory will be created.");return;}
+        auto entered=QDir::fromNativeSeparators(directory.text().trimmed());
+        // Resolve relative paths against the portable launcher directory, not the process CWD.
+        auto path=QDir::cleanPath(QDir(appRoot()).absoluteFilePath(entered));
+        if(entered.isEmpty() || QRegularExpression("^[A-Za-z]:[^/]").match(entered).hasMatch() || entered.endsWith(':') || !QFileInfo(path).isAbsolute() || QFileInfo(path).fileName().isEmpty() || (QFileInfo::exists(path) && !QFileInfo(path).isDir())){QMessageBox::warning(&dialog,"Project Directory","Enter a folder name, relative path or full directory path. A missing directory will be created.");return;}
         const bool nonEmpty=QFileInfo::exists(path) && !QDir(path).entryList(QDir::AllEntries|QDir::NoDotAndDotDot|QDir::Hidden|QDir::System).isEmpty();
         if(nonEmpty && QMessageBox::question(&dialog,"Directory Is Not Empty","The directory contains files or folders. Replace the project file and any matching default scripts?\n\nOther files are retained. Existing Lua files in effects will also be discovered.\n\n"+path,QMessageBox::Yes|QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes)return;
-        dialog.accept();
+        directory.setText(QDir::toNativeSeparators(path));dialog.accept();
     });
     connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);if(dialog.exec()!=QDialog::Accepted)return;
     const auto game=choices[gameGroup.checkedId()];auto folder=QDir::cleanPath(QDir::fromNativeSeparators(directory.text().trimmed()));QJsonArray effects;

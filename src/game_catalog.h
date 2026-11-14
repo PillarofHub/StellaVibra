@@ -14,10 +14,11 @@ inline QMap<QString,QString> dcsVariables(){return {
     {"LoGetAngularVelocity.x","rad/s"},{"LoGetAngularVelocity.y","rad/s"},{"LoGetAngularVelocity.z","rad/s"},
     {"LoGetMechInfo.gear.status","Native status"},{"LoGetMechInfo.gear.value","Native value"},
     {"LoGetMechInfo.gear.main.left.rod","Native rod; unit unverified"},{"LoGetMechInfo.gear.main.right.rod","Native rod; unit unverified"},
-    {"LoGetMechInfo.gear.main.nose.rod","Native rod; unit unverified"},
+    {"LoGetMechInfo.gear.nose.rod","Native rod; unit unverified"},
     {"LoGetMechInfo.flaps.status","Native status"},{"LoGetMechInfo.flaps.value","Native value"},
     {"LoGetMechInfo.speedbrakes.status","Native status"},{"LoGetMechInfo.speedbrakes.value","Native value"},
-    {"LoGetEngineInfo.RPM.left","%"},{"LoGetEngineInfo.RPM.right","%"}
+    {"LoGetEngineInfo.RPM.left","%"},{"LoGetEngineInfo.RPM.right","%"},
+    {"LoGetPayloadInfo.Cannon.shells","Remaining shells"},{"LoGetPayloadInfo.Stations","Station ID object; count/container/weapon.level1..4"}
 };}
 // Native RREF catalog referenced from Aurora Vibra (MIT; licenses/Aurora-MIT.txt).
 inline const QList<Dataref>& xplaneVariables(){static const QList<Dataref> fields{

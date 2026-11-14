@@ -2,6 +2,16 @@
 #include <QtWidgets>
 #include <functional>
 namespace sv {
+class EffectSortModel : public QSortFilterProxyModel {
+public:
+    using QSortFilterProxyModel::QSortFilterProxyModel;
+protected:
+    bool lessThan(const QModelIndex& left,const QModelIndex& right) const override {
+        const auto* files=qobject_cast<const QFileSystemModel*>(sourceModel());
+        if(files && files->isDir(left)!=files->isDir(right))return files->isDir(left);
+        return QSortFilterProxyModel::lessThan(left,right);
+    }
+};
 // Use the native item layout: indentation, checkbox, icon, then name.
 class EffectCheckDelegate : public QStyledItemDelegate {
 public:

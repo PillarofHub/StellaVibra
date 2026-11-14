@@ -20,7 +20,7 @@ foreach ($destination in $destinations) {
     & $cmake --install "$root\build" --config Release --prefix $destination
     if ($LASTEXITCODE) { throw 'Install failed' }
     # Remove only known obsolete shipped template files, never user project directories.
-    $oldTemplates=@('ground_roll.lua','touchdown.lua','ground/ground_roll.lua','ground/touchdown.lua','ground/ground_thumps.lua','aerodynamics/bank.lua','aerodynamics/flaps.lua','aerodynamics/overspeed.lua','aerodynamics/spoilers.lua','aerodynamics/stall.lua','engines/startup.lua','engines/shutdown.lua','engines/thrust.lua')
+    $oldTemplates=@('DCS/aerodynamics/high_aoa.lua','DCS/aerodynamics/overspeed.lua','ground_roll.lua','touchdown.lua','ground/ground_roll.lua','ground/touchdown.lua','ground/ground_thumps.lua','aerodynamics/bank.lua','aerodynamics/flaps.lua','aerodynamics/overspeed.lua','aerodynamics/spoilers.lua','aerodynamics/stall.lua','engines/startup.lua','engines/shutdown.lua','engines/thrust.lua')
     foreach($relative in $oldTemplates){$old=Join-Path "$destination/effects" $relative;if(Test-Path -LiteralPath $old -PathType Leaf){Remove-Item -LiteralPath $old}}
     $client2020="$root/.deps/msfs2020/client/SimConnect.dll"
     if(!(Test-Path $client2020) -or (Get-FileHash $client2020 -Algorithm SHA256).Hash -ne 'CFFB74B62B596A897B0FF101BAC3D66EA10236C540C75864658B451FFD1E6513'){throw 'Official MSFS 2020 SDK 0.24.6 client is missing or has an unexpected checksum'}

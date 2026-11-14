@@ -1,5 +1,38 @@
 # Stella Vibra 인수인계
 
+## 최신 작업 — 2026-11-15 Weapon Release·중단된 커밋 완료
+
+- 이전 Landing window 제거·폴더 우선 정렬·로그 분석·상대 프로젝트 경로·센터 수정/출력배정 변경은 미커밋 상태로 보존되어 있었다. 사용자 후속 요청으로 함께 커밋한다. High AoA/Overspeed는 DCS기본에서 제거, weapons/weapon_release.lua 추가(최종5개). 사용자 프로젝트의 기존 효과는 건드리지 않는다.
+- 공식 설치 Export.lua766–782행에Cannon.shells/Stations.count/container/weapon.level1..4 확인. relay v2에서 이 선택필드를 추가, station 숫자ID를문자열키로 보존(최대64), 노드상한1024/패킷16KiB 유지, payload초과면비행입력보존 위해생략. 고정loader/config/protocol1 유지. 사용자에게 Update Scripts 후DCS재시작 안내 필요. 실제설치조작 없음.
+- Weapon Release Power40 Constant, Gun80ms/Release150ms, 출력둘다Stick:1. 기총 잔탄과 동일station/type/container 수량 감소를 구분해 짧은 요청. 첫표본/누락/세션교체는baseline, 증가/종류변경/신규station은500ms 억제. 연속감소는종료기한교체. 소멸을0으로 해석하지 않으므로 마지막방출 누락 가능, 재무장중같은종류제거 오검출은 완전구분 불가. 이전 두 비행로그에는 무장필드가 없어 실동작 검증자료가 아님.
+- 배포 스크립트는 알려진 DCS두폐기템플릿만 Release/dist에서삭제, 사용자프로젝트·설정·진단보존. payload뷰/완성추가와센터rod완성경로정정. 버전0.2.1 유지, 태그/Release/푸시 없음.
+- 검증: scripts/build.ps1 -Deploy 성공(C++컴파일/링크·Lua48개구문검사), diff --check 통과. 소스/Release/dist 템플릿·relay·README/MANUAL 및 실행파일/PDB 해시 일치, 두폐기템플릿 없음, 배포전후 사용자프로젝트/pref/진단 파일 해시 보존. 실제설치/GUI/게임/HID/효과런타임 테스트는 실행하지 않았다. 다음 사용자 확인은 relay Update Scripts+DCS재시작 후 Gun/Release 감소·재무장·제티슨·마지막1발의station표현이다.
+
+## 최신 작업 — 2026-11-14 Landing window 제거·커밋
+
+- 사용자 승인으로 DCS Touchdown Landing window ms, landing_until/previous_air 및 만료 분기 제거. 각 기어는 공중 재무장 후 비공중 첫 rod 상승을 독립적으로 기다리고1회 armed를 소모한다. 늦은 센터 접지는 시간 제한 없음. Rearm200ms/수치guard1e-6/첫 상승 구간 기한/첫 연결·누락·유효성 방지는 유지. 기어별 접지 신호 없이 rod를 쓰는 추정 한계는 MANUAL/CONTRACTS에 명시.
+- 이전 미커밋 폴더 우선 정렬·로그 분석·센터 경로 수정/출력 재배정/High AoA·상대 New Project 경로까지 함께 선택해 사용자 요청 로컬 커밋. 버전0.2.1 유지, 태그/Release/푸시 없음. 사용자 프로젝트 복사본은 덮어쓰지 않으며 새기본Lua 복사 또는 새프로젝트 생성으로 적용한다. 제거된 Landing window/Minimum rod rise Override는 unresolved 정리가 필요할 수 있다.
+- 검증: scripts/build.ps1 -Deploy 성공, 컴파일/링크 대상 최신·Lua49개 구문 검사·diff --check 확인. 게임/GUI/HID/모터/런타임 테스트 실행 없음. 늦은 센터 착지와 기어별1회 처리는 사용자 확인 대상.
+
+## 최신 작업 — 2026-11-14 효과 보정·High AoA·상대 프로젝트 경로
+
+- 이전 미커밋 폴더 우선 정렬/로그 분석 변경 보존. 센터 Touchdown은 gear.nose.rod로 수정. Ground Roll은 변경 없음. 사용자 언급 Landing window/Rearm/Minimum rod rise는 Touchdown의 설정이다.
+- Rearm200ms와 Landing window1500ms 유지(공중 튐 재무장 억제/늦은 센터 감지 및 활주 중 오작동 제한). Minimum rod rise 노출 파라미터 제거,1e-6 내부 수치 guard. 기존 로그 양수 rod 증가의 호넷좌32/우41개는1e-6 이하, P-51은없음. 첫 상승 구간·첫 샘플/누락 억제 유지, 실행 검증 아님.
+- Shake는 이미 소수→설정 범위 정규화→Power강도 반올림→C++0–255 검증→승자선택→HID바이트로 전달됨. 범위0–1은 설정 기본값이며 API 상한 보장이 아님. 기본 범위/Power는 유지, 출력만 Stick:1+Throttle:1/2. G Load는Throttle:1/2, Overspeed는Stick:1 유지.
+- High AoA 새기본Lua(총6개): 공중·유효 AoA의 Start10→Full20 스케일, Power20 Constant, Stick:1, Warning enabled=false. 설치 공식 Export.lua454행rad표기와 로그(최대15.649/9.242)의 해석 불일치 때문에 단위를 임의 변환하지 않고 native 문턱으로 비교. 자동 실속/실제 버핏/조종석 AoA units 아님. 최종 체감/기체별 문턱은 사용자 확인.
+- New Project에 폴더명/상대경로 입력 가능, portable launcher appRoot 기준(내부bin/processCWD 아님). Browse 초기경로도 일치. 정규화한 절대 경로로 덮어쓰기 확인·생성. 빈 입력 및 C:Projects 같은 모호한 drive-relative 거부.
+- 기존 프로젝트 복사본/Override·로그는 보존. 새기본Lua를 기존프로젝트에 적용하려면 사용자가 복사/새프로젝트 생성 필요. 제거된 Minimum rod rise Override가 있으면 unresolved에서 정리한다. 버전0.2.1 유지, 커밋/태그/Release/푸시 없음.
+- 검증: 최종 scripts/build.ps1 -Deploy 성공, C++ 컴파일/링크·Lua49개 구문 검사·diff --check 통과. Release/dist 실행파일/PDB/README/MANUAL·6개DCS기본Lua 및 소스 해시 일치, 분석 로그2개 해시 보존 확인. GUI/실제 상대경로 생성/센터착지/High AoA·HID 출력은 실행 검증하지 않았다.
+
+## 최신 작업 — 2026-11-14 폴더 우선 정렬·P-51D/호넷 로그 분석
+
+- 시작 git status clean. EffectSortModel로 디렉토리 여부를 먼저 비교하고 동일 종류는 기존 대소문자 무관 이름 비교를 유지한다. 파일 모델 재구성과 이름 변경 후에도 같은 프록시 비교 정책을 사용한다. README/MANUAL 갱신.
+- 사용자 지정 로그2개를 f/d/x 복원 후 분석. P-51D 945표본, 호넷1788표본; 첫 기존 표본 포함으로 end samples보다1 많음. malformed/#dropped/구간 내 송신 순번 누락 없음. P-51 마지막에는 입력 만료1행. 상세31개 필드 범위/사건 시각/한계는 docs/DCS-LOG-ANALYSIS.md.
+- Shake는0/1이 아님: P-51 최대0.2610·기본강도 최대8, 호넷 최대1.0443e-5·기본강도 전부0. 호넷 공중true는약0.33초라 충분한 비행 버핏/고G 검증자료 아님. 엔진RPM/플랩 변화는 확장 입력 후보, 무장/기총은 미수집.
+- 센터 Touchdown 원인 확인: 원본은 gear.nose.rod, 코드가 gear.main.nose를 조회하여nil. P-51 착지104ms후, 호넷887ms후 nose 양수 관측. 이번 정렬/분석 단위에서는 효과를 수정하지 않았다. 다음 효과 수정 때 좌우는main, 센터는gear.nose로 읽어야 한다. 기존 조사 문서 경로는 정정했다.
+- 버전0.2.1 유지, 이번 커밋 요청 없음. GUI/게임/HID/런타임 테스트 실행 없음. 원본 로그·사용자 프로젝트·설정 보존.
+- 검증: scripts/build.ps1 -Deploy 성공, C++ 컴파일/링크·Lua48개 구문 검사·diff --check 통과. Release/dist 실행파일/PDB/README/MANUAL 해시 일치, 분석한 로그2개 해시 보존 확인. 폴더 우선 GUI 정렬은 사용자 확인 대상.
+
 ## 최신 작업 — 2026-11-14 실기 피드백·Explorer·텔레메트리 Logging
 
 - 사용자 확인: DCS Ground Roll 양호, P-51 메인기어 Touchdown 정상. 센터(테일) 감지 미확인. Shake가0/1인지 아직 가설이며 원본 기록으로 검토한다. 기본 Shake/G Load/Overspeed Power.pwm=false, 기존 프로젝트 복사본·Override 보존.

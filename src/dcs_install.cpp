@@ -142,7 +142,7 @@ void installDcsTelemetry(const QString& scripts,int interval,const std::function
             if(!previous.contains(path) || previous[path]!=it.value())write(path,it.value());
             if(it.key()!="config.lua")hashes[it.key()]=hash(it.value());
         }
-        const QJsonObject m{{"owner","StellaVibra Telemetry"},{"schema",2},{"hashes",hashes},{"interval_ms",interval},{"relay_version",1}};
+        const QJsonObject m{{"owner","StellaVibra Telemetry"},{"schema",2},{"hashes",hashes},{"interval_ms",interval},{"relay_version",2}};
         write(managed(scripts)+"/manifest.json",QJsonDocument(m).toJson());
         sameExport(scripts,before);
         if(after!=before.bytes || !before.exists)write(QDir(scripts).filePath("Export.lua"),after);

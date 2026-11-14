@@ -1,4 +1,4 @@
--- Stella Vibra DCS relay v1; DCS Lua 5.1 compatible. No effect decisions here.
+-- Stella Vibra DCS relay v2; DCS Lua 5.1 compatible. No effect decisions here.
 if _G.StellaVibraTelemetryLoaded then return end
 local root = lfs.writedir() .. "Scripts/StellaVibra Telemetry/"
 local config = dofile(root .. "config.lua")
@@ -40,7 +40,7 @@ local function encode(value, depth, budget)
         local fields = {}
         for key, item in pairs(value) do
             budget.n = budget.n + 1
-            if budget.n > 256 then error("Telemetry structure limit") end
+            if budget.n > 1024 then error("Telemetry structure limit") end
             if type(key) == "string" and #key <= 64 then
                 local encoded = encode(item, depth + 1, budget)
                 if encoded then fields[#fields + 1] = quote(key) .. ":" .. encoded end
@@ -54,6 +54,28 @@ local function newSession()
     generation = generation + 1
     session = string.format("%.6f", socket.gettime()) .. ":" .. tostring(udp) .. ":" .. generation
     sequence, nextSend = 0, 0
+end
+local function payloadSnapshot()
+    local payload = call("LoGetPayloadInfo")
+    if type(payload) ~= "table" then return nil end
+    local result = {}
+    if type(payload.Cannon) == "table" then result.Cannon = {shells=payload.Cannon.shells} end
+    if type(payload.Stations) == "table" then
+        local stations, count = {}, 0
+        for index, station in pairs(payload.Stations) do
+            if (type(index) == "string" or (type(index) == "number" and index >= 0 and index % 1 == 0))
+                and type(station) == "table" then
+                count = count + 1
+                if count > 64 then report("payload", "More than 64 stations; stations omitted"); return result end
+                local weapon = station.weapon
+                stations[tostring(index)] = {count=station.count, container=station.container,
+                    weapon=type(weapon) == "table" and {level1=weapon.level1, level2=weapon.level2,
+                        level3=weapon.level3, level4=weapon.level4} or nil}
+            end
+        end
+        result.Stations = stations -- Preserve station IDs as JSON object keys, including sparse indices.
+    end
+    return result
 end
 local function publish(stopped)
     local modelTime = call("LoGetModelTime")
@@ -72,11 +94,18 @@ local function publish(stopped)
         if type(mech) == "table" then data.LoGetMechInfo = {gear=mech.gear, flaps=mech.flaps, speedbrakes=mech.speedbrakes} end
         local engine = call("LoGetEngineInfo")
         if type(engine) == "table" then data.LoGetEngineInfo = {RPM=engine.RPM} end
+        data.LoGetPayloadInfo = payloadSnapshot()
     end
     sequence = sequence + 1
-    local packet = encode({protocol=1, session=session, sequence=sequence, sim_time=modelTime,
+    local message = {protocol=1, session=session, sequence=sequence, sim_time=modelTime,
         sent_ms=math.floor(socket.gettime()*1000), interval_ms=config.interval_ms,
-        stopped=stopped, dcs=data}, 0, {n=0})
+        stopped=stopped, dcs=data}
+    local packet = encode(message, 0, {n=0})
+    if #packet > 16384 and data.LoGetPayloadInfo then
+        data.LoGetPayloadInfo = nil
+        report("payload size", "Payload omitted to preserve flight telemetry within 16 KiB")
+        packet = encode(message, 0, {n=0})
+    end
     if #packet <= 16384 then udp:send(packet) else report("packet", "Telemetry exceeds 16 KiB") end
 end
 local function chain(name, own)

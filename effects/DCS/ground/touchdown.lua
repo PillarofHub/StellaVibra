@@ -1,14 +1,14 @@
 local effect = {}
 local gears = {{key="nose", output="Center Gear"}, {key="left", output="Left Gear"}, {key="right", output="Right Gear"}}
+local rod_epsilon = 0.000001 -- Numerical jitter guard, not a physical load threshold.
 
 function effect:init(context)
     context:parameter {name="Power", type="haptic_power", default={strength=40, pwm=false, on_ms=20, period_ms=80}}
     context:parameter {name="Minimum ms", type="int", default=200, min=20, max=3000, step=1}
     context:parameter {name="Maximum ms", type="int", default=2000, min=20, max=5000, step=1}
     context:parameter {name="Time multiplier", type="float", default=2, min=0.1, max=10, step=0.1}
+    -- Require sustained airborne samples before accepting another landing.
     context:parameter {name="Rearm ms", type="int", default=200, min=100, max=3000, step=1}
-    context:parameter {name="Landing window ms", type="int", default=1500, min=100, max=5000, step=1}
-    context:parameter {name="Minimum rod rise", type="float", default=0.0001, min=0, max=1, step=0.0001}
     context:output("Center Gear", {"Stick:1"})
     context:output("Left Gear", {"Throttle:1"})
     context:output("Right Gear", {"Throttle:2"})
@@ -22,19 +22,18 @@ function effect:update(context, telemetry, parameters)
     local air = dcs.LoGetInAir
     local sim = (telemetry.transport or {}).sim_time
     local mech = dcs.LoGetMechInfo
-    local main = type(mech) == "table" and type(mech.gear) == "table" and mech.gear.main or nil
+    local gear_info = type(mech) == "table" and mech.gear or nil
+    local main = type(gear_info) == "table" and gear_info.main or nil
     local now = context:now()
     if not context:input_valid() or type(air) ~= "boolean" or type(sim) ~= "number" then
-        self.gears, self.previous_air, self.landing_until = {}, nil, nil
+        self.gears = {}
         for _, gear in ipairs(gears) do context:vibrate(gear.output, off()) end
         return
     end
     local fresh = context:sample_is_new()
-    if fresh and not air and self.previous_air == true then
-        self.landing_until = now + parameters.Landing_window_ms
-    end
     for _, gear in ipairs(gears) do
-        local source = type(main) == "table" and main[gear.key] or nil
+        local parent = gear.key == "nose" and gear_info or main
+        local source = type(parent) == "table" and parent[gear.key] or nil
         local rod = type(source) == "table" and source.rod or nil
         local state = self.gears[gear.key] or {}
         if type(rod) ~= "number" then
@@ -47,8 +46,8 @@ function effect:update(context, telemetry, parameters)
                 end
             else
                 state.air_since = nil
-                if not self.landing_until or now > self.landing_until then state.armed = false end
-                local rising = state.rod ~= nil and rod > state.rod + parameters.Minimum_rod_rise
+                -- Each armed gear waits independently; delayed center contact has no timeout.
+                local rising = state.rod ~= nil and rod > state.rod + rod_epsilon
                 if state.armed and rising and state.sim ~= nil and sim > state.sim then
                     -- Native rod increase is an experimental compression proxy, not force.
                     state.armed, state.rising = false, true
@@ -72,7 +71,6 @@ function effect:update(context, telemetry, parameters)
         if remaining > 0 then context:vibrate(gear.output, parameters.Power, remaining)
         else context:vibrate(gear.output, off()) end
     end
-    if fresh then self.previous_air = air end
 end
 
 return effect

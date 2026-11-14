@@ -1,6 +1,12 @@
 # DCS 공통 텔레메트리와 효과 가능성 검토
 
+2026-11-15 최신 결정: High AoA/Overspeed 기본 제거, weapon_release 채택. 공식 Export.lua766–782행의 Cannon.shells와 Stations.count/container/weapon.level1..4를 relay v2에서 수집한다. 기총/기타잔량 감소는 구분하지만 발사/제티슨/재무장 원인 구분은 불가. 상세 최신구현은 CONTRACTS와 MANUAL을 따르며 아래 과거 채택/보류 기록보다 우선한다.
+
 조사일: 2026-11-13. 상태: 설계 검토, 구현 계약 미확정. 조사 시작 기준은 0.2.0이었다. 이후 파일 관리 UI 작업은 사용자 지정 0.2.1로 정리하며 DCS 설치·수신 기반은 후속 구현되었으며 계약은 DCS-INTEGRATION.md를 따른다. 2026-11-14 사용자 요청으로 조사된 입력에 기반한 기본 효과 5개를 구현한다. 실기 검증 전의 실험적 출발값이며 최신 계약은 CONTRACTS.md를 따른다.
+
+2026-11-14 실측 후속: P-51D/호넷 이착륙 로그에서 center rod는 gear.main.nose가 아니라 gear.nose로 확인됐다. 후속 승인으로 기본 Lua의 센터 경로 오류를 수정했다. Shake는 연속 소수이며 두 기체의 관측 크기가 크게 다르다. 상세는 [로그 분석](DCS-LOG-ANALYSIS.md)을 따른다.
+
+최신 구현: High AoA를 선택 효과로 추가했다. LoGetAngleOfAttack 설치 주석은rad이지만 실측 값과 불일치하므로 raw 문턱만 비교하고 변환하지 않는다. 기본false, Start10/Full20은 조절 출발값이다. 아래 과거 제외 결정보다 최신 사용자 요청이 우선한다.
 
 ## 후속 사용자 결정 및 엔진 검토
 
@@ -62,7 +68,7 @@
 | 진동 크기 | `LoGetShakeAmplitude()` | shake/vibration amplitude, 숫자 | 범위·정규화·원인별 분리 미명시. 단위 없는 원본 스칼라로 보존, 0..1 강제 가정 금지 |
 | 엔진 | `LoGetEngineInfo().RPM.left/right`, `Temperature`, `FuelConsumption`, `HydraulicPressure` | RPM %, 온도 섭씨, 연료유량 kg/s, 압력 kg/cm² | 좌/우 스키마. 단발의 두 값/엔진 수를 추정하지 않음. 추력·토크·공통 starter/combustion은 문서 구조에 없음 |
 | 기계 상태 | `LoGetMechInfo().gear`, `flaps`, `speedbrakes` 등의 `status/value` | 필드 확인됨, 각 상태 코드·값 범위는 이 문서에 미명시 | 값 변화는 관측 가능하지만 모두 0..1/퍼센트라는 계약은 아직 불가 |
-| 기어 rod | `gear.main.left/right/nose.rod` | 필드 이름만 명시 | 압축 방향·단위·정규화·기체별 갱신 보장 불명. 현재 바퀴별 압축 계약으로 확정 불가 |
+| 기어 rod | `gear.main.left/right.rod`, `gear.nose.rod` | 필드 이름만 명시 | 압축 방향·단위·정규화·기체별 갱신 보장 불명. 현재 바퀴별 압축 계약으로 확정 불가 |
 | 실속 경고 | `LoGetMCPState().StallSignalization` | boolean | 필드는 확인됨. 모든 모듈의 고유 실속 경고를 공통 반영한다는 보장 없음 |
 | 무장 | `LoGetPayloadInfo().Stations`, `.CurrentStation`, `.Cannon.shells` | station별 `weapon.level1..4`, `count`, `container`; 기총 잔탄 | 재고 스냅샷. 발사·비상투하·재무장 이벤트가 아님. `CurrentStation`은 발사 증명 아님 |
 | 보조 FM | `LoGetFMData()` | cockpit G_factor, body-axis speed/acceleration, angular speed rad/s, angular acceleration rad/s², 자세 rad, master | 세부 필드 가용성·일부 단위 미명시. 기존 속도/G와 중복 수집하지 말고 필요 시 선택 |
