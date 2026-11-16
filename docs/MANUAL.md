@@ -1,6 +1,6 @@
-# Stella Vibra 0.4.0 User Manual
+# Stella Vibra 0.4.2 User Manual
 
-[README](../README.md) · [0.4.0 release notes](RELEASE-NOTES-0.4.0.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
+[README](../README.md) · [0.4.2 release notes](RELEASE-NOTES-0.4.2.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
 ## Installation and first launch
 
@@ -84,7 +84,7 @@ The installer keeps loader.lua, telemetry.lua, config.lua and manifest.json unde
 
 Each file is saved atomically, but the installation is not one multi-file transaction. If files change during confirmation, the operation stops. Modified managed files can be repaired through Restore Scripts. UTF-16/32 Export.lua files and linked installation paths are not automatically modified. Do not run another exporter installer simultaneously.
 
-Create or open a project with **Target Game: DCS** to receive telemetry. Select **Generate default Lua scripts** when creating a project to include the five effects below. Existing projects are not overwritten; you can copy selected files from the bundled effects/DCS directory into an existing project's effects directory. Other games keep their own connections. The DCS receiver binds only **127.0.0.1:43891 (UDP)** and closes when you switch games or close the project. A port conflict is reported in Debug Output. No separate server is required.
+Create or open a project with **Target Game: DCS** to receive telemetry. Select **Generate default Lua scripts** when creating a project to include the six effects below. Existing projects are not overwritten; you can copy selected files from the bundled effects/DCS directory into an existing project's effects directory. Other games keep their own connections. The DCS receiver binds only **127.0.0.1:43891 (UDP)** and closes when you switch games or close the project. A port conflict is reported in Debug Output. No separate server is required.
 
 The relay uses DCS frame callbacks, sends at most once per configured interval, and cannot run faster than DCS frames. Packets carry protocol version 1, session, sequence, simulation and send times, pause/export permission state and selected native values. Duplicate, out-of-order, malformed and old packets are ignored. Input expires within 500 ms of sending or simulation-clock progress; replaying a snapshot inside Stella does not renew its lifetime. The first sample after a session/aircraft change or long gap establishes a baseline.
 
@@ -94,7 +94,7 @@ Automatic profile discovery has been confirmed by the project owner. Installatio
 
 ## Diagnostics
 
-The 0.4.0 distribution excludes the temporary Settings → Logging menu and telemetry capture. Normal Debug Output and crash diagnostics remain available. Existing diagnostic files are not deleted by an update.
+The 0.4.2 distribution excludes the temporary Settings → Logging menu and telemetry capture. Normal Debug Output and crash diagnostics remain available. Existing diagnostic files are not deleted by an update.
 
 ## Relative project paths
 
@@ -102,22 +102,29 @@ New Project accepts a folder name (for example `Hornet`) or a relative path (`.\
 
 ## DCS default effects
 
+The current templates require **Update Scripts** and a DCS restart for relay v3 wheel inputs. Copy updated templates into existing projects or create a new project; template updates do not overwrite personal scripts/settings. Ground Roll replaces the old Ground output with Center/Left/Right Gear and removes Minimum speed; remove unresolved old overrides and review routing. Wheel arguments are cyclic animation values, not RPM: 50ms sampling may miss rotations, and unsupported fixed zero cannot be distinguished from a stopped wheel. Hornet carrier operation was confirmed by the owner; P-51D/Fw 190 D-9 wheel rotation still needs live verification. Missing wheel/rod data stops that gear's output.
+
+G Load's 6–9 G range is a tunable high-G cue, not a universal wing-failure or blackout threshold. Power defaults to 20; stronger Constant requests such as Shake can win on the same motor under the existing priority rules. The default intentionally allows stronger Shake to take precedence. Airbrake uses the native speedbrakes value; aircraft that do not expose it are unsupported. Its deployment-only intensity does not model airflow or blend with Shake.
+
+**File → Open Recent → Configure Recent Projects...** supports multiple selection, Remove Selected, Save and Cancel. Saving changes only history; files and the current project remain intact. Reopening a project adds it to history again.
+
 These are experimental starting settings, not aircraft-certified limits or force feedback. Missing inputs stop the dependent effect; they are never treated as measured zero. All effects use common Export API paths, without aircraft-specific cockpit mappings.
 
 | Script | Input and behavior | Default output / settings |
 | --- | --- | --- |
-| ground/ground_roll.lua | Not in air and horizontal world velocity above Minimum speed. Constant intensity, no simulated runway slabs. World velocity is not carrier-relative. | Stick:1, Throttle:1 and Throttle:2; strength 1, PWM 20/80 ms; minimum speed 0.5 in native velocity units |
+| ground/ground_roll.lua | Not in air, positive per-gear rod and changing wheel rotation argument (101 center, 103 left, 102 right). No world-speed fallback. First samples establish a baseline. | Center Gear → Stick:1, Left Gear → Throttle:1, Right Gear → Throttle:2; strength 1, PWM 20/80 ms |
 | ground/touchdown.lua | First increase of each gear.main.left/right.rod or gear.nose.rod after airborne rearming and an air-to-ground transition. Rod direction, scale and aircraft support need flight verification. | Center Gear → Stick:1; Left/Right Gear → Throttle:1/2; strength 40 Constant; 200–2000 ms, Time multiplier 2 |
-| aerodynamics/airframe_shake.lua | LoGetShakeAmplitude scaled between Minimum amplitude and Full power amplitude, clamped at Power strength. No artificial separation of engine shake and aerodynamic buffet. | Stick:1, Throttle:1 and Throttle:2; strength 30, Constant; amplitude 0–1 |
-| aerodynamics/g_load.lua | Airborne LoGetAccelerationUnits.y scaled between Start G and Full power G. Direction selects Positive, Negative or Both; negative thresholds use magnitudes. | Throttle:1 and Throttle:2; strength 25, Constant; Positive, 2–6 G |
+| aerodynamics/airframe_shake.lua | LoGetShakeAmplitude scaled between Minimum amplitude and Full power amplitude, clamped at Power strength. No artificial separation of engine shake and aerodynamic buffet. | Stick:1, Throttle:1 and Throttle:2; strength 40, Constant; amplitude 0–2 |
+| aerodynamics/airbrake.lua | Airborne with LoGetMechInfo.speedbrakes.value above Deployment threshold. Synthetic deployment feedback, not measured buffet; no universal spoiler detection. | Throttle:1 and Throttle:2; strength 2, Constant; threshold 0.01 |
+| aerodynamics/g_load.lua | Airborne LoGetAccelerationUnits.y scaled between Start G and Full power G. Direction selects Positive, Negative or Both; negative thresholds use magnitudes. | Throttle:1 and Throttle:2; strength 20, Constant; Positive, 6–9 G |
 | weapons/weapon_release.lua | Cannon-ammunition and same-type station-count decreases; the cause of removal is not identified. | Gun and Release → Stick:1; strength 40, Constant; Gun 80 ms, Release 150 ms |
 
 
-Shake maps the configured range to integer output: `round(Power.strength * clamp((shake - Minimum amplitude) / (Full power amplitude - Minimum amplitude), 0, 1))`. Power supports 0–255; strength zero turns the request off. With Power 30 and input range 0–1, shake 0.1 gives 3 and shake 0.25 gives 8. Full power amplitude remains 1 until the user tunes it; the observed tiny Hornet signal is not automatically amplified.
+Shake maps the configured range to integer output: `round(Power.strength * clamp((shake - Minimum amplitude) / (Full power amplitude - Minimum amplitude), 0, 1))`. Power supports 0–255; strength zero turns the request off. With Power 40 and input range 0–2, shake 0.1 gives 2 and shake 0.25 gives 5. Full power amplitude defaults to 2; the observed tiny Hornet signal is not automatically amplified.
 
 `weapons/weapon_release.lua` provides **Gun** and **Release**, both mapped to Stick:1 by default. Power defaults to 40 Constant; Gun ms 80 and Release ms 150 are independent event durations. Gun detects a decrease in LoGetPayloadInfo.Cannon.shells. Release detects a decrease in a station count with unchanged station ID, weapon.level1..4 and container value. Multiple decreases in one sample produce one pulse per output; later decreases extend that output's pulse without accumulating time. These are inventory-change cues, not proof of firing: release, launch, jettison and some rearming removals cannot be distinguished.
 
-Use Settings → Set DCS Telemetry → **Update Scripts**, then restart DCS to install relay v2. The Export.lua loader line, interval configuration and protocol 1 stay unchanged. Missing payload data produces no weapon vibration. Station indices are preserved as string keys, for example `telemetry.dcs.LoGetPayloadInfo.Stations["1"].count`; absent stations are not converted to zero. Cannon and station availability are independent. First samples, invalid input and aircraft/session changes establish a new baseline. Increased counts, new stations or changed types reset comparisons and suppress pulses for 500 ms. Rearming removals can still be ambiguous; a station that disappears or changes type on its last release may be missed deliberately. No airborne restriction is imposed, so ground firing is supported when counts are provided.
+Use Settings → Set DCS Telemetry → **Update Scripts**, then restart DCS to install relay v3. The Export.lua loader line, interval configuration and protocol 1 stay unchanged. Missing payload data produces no weapon vibration. Station indices are preserved as string keys, for example `telemetry.dcs.LoGetPayloadInfo.Stations["1"].count`; absent stations are not converted to zero. Cannon and station availability are independent. First samples, invalid input and aircraft/session changes establish a new baseline. Increased counts, new stations or changed types reset comparisons and suppress pulses for 500 ms. Rearming removals can still be ambiguous; a station that disappears or changes type on its last release may be missed deliberately. No airborne restriction is imposed, so ground firing is supported when counts are provided.
 
 The relay queries payload at the configured interval and sends only Cannon.shells and station count/container/type, up to 64 stations. If the payload would exceed 16 KiB it is omitted to preserve flight telemetry. Missing inputs remain unavailable. Payload fields appear in Telemetry; the earlier P-51/Hornet logs predate payload collection and cannot validate this effect. Old High AoA/Overspeed files are removed only from bundled templates; existing user projects keep their copies and can disable/delete them manually.
 
@@ -163,7 +170,7 @@ Run only the selected MSFS version. If both versions are running, connection is 
 
 ### X-Plane 12
 
-Use the local simulator's UDP RREF endpoint at `127.0.0.1:49000`. Stella subscribes automatically to its 86-field catalog. A non-default simulator UDP port is not configurable in 0.4.0. The inspector and Lua use original dataref paths and native numeric values. Fast fields are requested at 20 Hz and aircraft information at 1 Hz. Live simulator verification is pending.
+Use the local simulator's UDP RREF endpoint at `127.0.0.1:49000`. Stella subscribes automatically to its 86-field catalog. A non-default simulator UDP port is not configurable in 0.4.2. The inspector and Lua use original dataref paths and native numeric values. Fast fields are requested at 20 Hz and aircraft information at 1 Hz. Live simulator verification is pending.
 
 ### War Thunder
 
@@ -250,4 +257,4 @@ Debug Output is also recorded under `diagnostics/`. Session logs rotate at 2MiB,
 
 Help → README and Help → User Manual display the same local Markdown sources used on GitHub, in a nonmodal document window. The reader uses readable body text, heading spacing, monospaced code, and padded table cells. Images fit the available document width, with a maximum displayed width of 720 pixels. Back/Forward/Home navigate documents; relative links and images resolve from the current document, and web links open your browser. This is a Qt rich-text reader, not a full web browser or a pixel-identical GitHub page. About shows version and license information. Keep the full package, including docs and logo assets, together.
 
-Version 0.4.0 adds DCS support. The project owner confirmed the improved README/manual display; effect and aircraft limitations remain as described in the [0.4.0 release notes](RELEASE-NOTES-0.4.0.md). Remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.
+Version 0.4.2 improves DCS wheel feedback and effect defaults. The project owner confirmed the improved README/manual display; effect and aircraft limitations remain as described in the [0.4.2 release notes](RELEASE-NOTES-0.4.2.md). Remote simulator connections, arbitrary device protocols and a full IDE/debugger are not included.

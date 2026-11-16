@@ -43,7 +43,7 @@ void Editor::completeMember() {
     if(isReadOnly() || document()->property("json").toBool())return;
     const auto before=toPlainText().left(textCursor().position());
     const auto game=property("game").toString();
-    auto lookup=QRegularExpression(R"rx((\btelemetry(?:\.(?:state|indicators))?)\[(["'])([^"'\n]*)$)rx").match(before);
+    auto lookup=QRegularExpression(R"rx((\btelemetry(?:\.(?:state|indicators|dcs\.LoGetAircraftDrawArgumentValue))?)\[(["'])([^"'\n]*)$)rx").match(before);
     // A native game key is intentionally completed inside this one string literal.
     const auto scan=lookup.hasMatch()?before.left(lookup.capturedStart()):before;
     // Skip strings and comments, including Lua long brackets. Never execute draft code.
@@ -66,6 +66,7 @@ void Editor::completeMember() {
     }
     if(lookup.hasMatch()) {
         QStringList keys;const auto object=lookup.captured(1);
+        if(game=="DCS" && object=="telemetry.dcs.LoGetAircraftDrawArgumentValue")keys={"101","102","103"};
         if(game=="XPlane12" && object=="telemetry")for(const auto& field:xplaneVariables())keys<<field.name;
         if(game=="WarThunder" && object=="telemetry.state")keys=warThunderStateKeys()+property("wtStateKeys").toStringList();
         if(game=="WarThunder" && object=="telemetry.indicators")keys=warThunderIndicatorKeys()+property("wtIndicatorKeys").toStringList();
@@ -88,7 +89,10 @@ void Editor::completeMember() {
         else if(game=="DCS" && object=="telemetry.transport")names={"protocol","session","sequence","sim_time","sent_ms","interval_ms","stopped"};
         else if(game=="DCS" && (object=="telemetry.dcs" || object.startsWith("telemetry.dcs."))){
             const auto prefix=object=="telemetry.dcs"?QString():object.mid(QString("telemetry.dcs.").size())+".";
-            for(const auto& key:dcsVariables().keys())if(key.startsWith(prefix))names<<key.mid(prefix.size()).section('.',0,0);
+            for(const auto& key:dcsVariables().keys())if(key.startsWith(prefix)){
+                const auto member=key.mid(prefix.size()).section('.',0,0);
+                if(luaIdentifier(member))names<<member;
+            }
             names.removeDuplicates();
         }
         else if(game=="WarThunder" && object=="telemetry")names={"state","indicators"};

@@ -1,4 +1,40 @@
 # Stella Vibra 인수인계
+## 2026-11-16 버전 0.4.2 확정
+
+검증: scripts/build.ps1 -Deploy 성공(C++ 컴파일/링크·Lua49개 구문 검사). Release/dist 두 실행파일 ProductVersion0.4.2, 소스/Release/dist 변경Lua·README·MANUAL·0.4.2릴리스노트 해시 일치. diff --check 통과. 앱/게임/HID/런타임 테스트는 실행하지 않았다. 요청한 관련 파일을 선택해 로컬 커밋한다.
+
+사용자가 호넷 항모에서 새 휠 기반 Ground Roll 동작을 확인했다. P-51D/도라 및 전 기체 검증으로 일반화하지 않는다. Airbrake 기본 Power2, G Load 기본 Power20으로 변경하며 Shake40/입력0–2, G6–9는 유지한다. 기존 우선순위상 Shake가 G Load보다 우선할 수 있는 동작을 수용한다. 기존 프로젝트/기체 override는 보존하며 새 기본값으로 자동 덮어쓰지 않는다.
+
+사용자가 0.4.2 지정 및 로컬 커밋을 요청했다. 직전 미커밋 휠/relay3/에어브레이크/최근목록 관리 변경을 함께 커밋하고 scripts/build.ps1 -Deploy로 갱신한다. 태그/푸시/Release/ZIP 생성은 이번 요청에 포함되지 않는다. 과거 조사 보류/0.4.0 유지/커밋 없음 기록보다 이 결정을 우선한다.
+
+## 최신 구현 — 2026-11-16 휠별 Ground Roll·Airbrake·최근 목록 관리
+
+- 사용자 승인으로 직전 조사 보류를 해제했다. relay v3가 draw 인자101/102/103을 문자열 키로 전송한다. 고정 로더/설정/protocol1 유지. 수신 엔진의 원본 전달 구조는 그대로, catalog/뷰 및 대괄호 문자열 자동완성 추가. 사용자는 Update Scripts 후 DCS를 재시작해야 한다.
+- Ground Roll은 세계속도/Minimum speed/통합 Ground 출력을 제거하고 Center/Left/Right Gear로 분리했다. Stick1/Throttle1/Throttle2 기본 배정, Power1 PWM20/80 유지. 각 gear의 rod 양수와 새 표본의 회전 변화가 필요하며 첫 샘플·누락·공중에서는 출력하지 않는다. 초기화는 기존 엔진의 session/기체/시간 역행/유효성 전환 처리도 적용된다. 미지원0·50ms aliasing 및 rod 접지 대체의 한계가 있다. 기존 프로젝트는 자동 변경하지 않는다.
+- Shake Power40/amplitude0–2, G Load6–9G/Power25. 6G는 실제 파손 한계가 아닌 고G 경고 시작점이며 기체별 조절 대상이다. 강한 Shake와 같은 모터에서 G Load가 가려질 수 있다는 기존 우선순위 한계를 매뉴얼에 명시했다.
+- airbrake.lua 추가: 기존 speedbrakes.value>0.01 및 공중에서 Power20 Constant, 스로틀1/2. 전개 상태의 합성 진동이며 실제 버핏/모든 spoiler 지원이 아니다. 총47효과+2relay Lua.
+- Open Recent → Configure Recent Projects...에 다중선택/Remove Selected/Save/Cancel. 최근 목록만 제거하고 실제 파일/열린 프로젝트/last_project는 유지한다. 다시 열면 목록에 추가된다.
+- 기존 HANDOFF 조사 변경을 보존했다. 버전0.4.0 유지, 공개ZIP 재생성/커밋/태그/업로드는 요청되지 않아 수행하지 않는다. GUI/게임/HID/테스트 실행 없음. 검증: scripts/build.ps1 -Deploy 성공(C++ 컴파일/링크, Lua49개 구문 검사). 소스/Release/dist 문서·변경Lua 및 Release/dist 실행파일/PDB 해시 일치, 개인파일57개 사전 해시 보존, diff --check 통과. 새GUI/항모·기체별 회전/에어브레이크 실기는 사용자 확인 대상.
+
+## 후속 조사 — 2026-11-16 P-51D·Fw 190 D-9 회전 인자
+
+- 사용자의 Fw109는 이전 도라 맥락에 따라 Fw 190 D-9로 해석해 조사한다고 먼저 알렸다. 구현은 계속 보류한다.
+- 101/102/103은 LoGetAircraftDrawArgumentValue의 대체 API가 아니라 함수에 전달하는 번호다. 공식 설치 Scripts/Export.lua:862는 번호 한 개를 받아 자기 외형 인자 숫자 하나를 반환한다고 명시한다. 조종석 GetDevice 인자와 다른 공간이다. P-51D clickabledata.lua의102/103은 발전기/배터리 스위치이며 외형 바퀴 매핑의 반증이나 증거가 아니다.
+- Mods/aircraft/P-51D 및 FW-190D9의 공개 FMOptions.lua/텍스트 파일, CoreMods/WWII Units/P-51D/P-51D.lua 및 FW-190D-9/FW-190D-9.lua를 확인했다. 바퀴 물성/직경은 있으나 arg_wheel_rotation 101/102/103 연결은 찾지 못했다. 이 부재를 미지원으로 단정하지 않는다. 호넷/아파치 설정 확인과 두 전쟁기 미확인을 구분한다.
+- 웹의 P-51D 외형 인자 직접 시험 기록(ED 포럼 main-menu-hangar/page/4/, 2018-05-19)도 조회했으나101/102/103은 시험 목록에 없다. 현재 버전 지원 확인 근거가 아니다. ED 포럼 첨부 일반 인자표는 검색 색인에101–103 휠 회전이 보이나 원문 접근403으로 추가 확인 불가.
+- 권고: 세 원본 인자를 동일한 방식으로 수집해 회전 여부에 활용하는 방향을 우선 검증하되, 범용 휠 속도/RPM API로 명명하거나 전 기체 보장을 하지 않는다. 접지한 기어의 회전 변화로 판정해야 테일기어 이륙 후 잔류 회전을 오인하지 않는다. 50ms 위상 aliasing 및 고정0의 미지원/정지 구별 한계 유지. 게임 실행/코드 변경/빌드/커밋 없음. HANDOFF 조사 기록만 갱신.
+
+## 최신 조사 — 2026-11-16 항모 정지 중 Ground Roll
+
+- 사용자 보고: 항모 착함 후 갑판에 정지해도 Ground Roll이 지속된다. 이번 요청은 조사만이며 코드 수정 금지다. 시작 git status는 clean.
+- 현 effects/DCS/ground/ground_roll.lua는 LoGetInAir=false 및 세계 x/z 속도 크기로 출력한다. 항모 이동을 제거하지 않으므로 보고된 현상을 설명한다. 기존 패킷에는 휠 회전이나 접촉 갑판 속도가 없어 효과 Lua만으로 정확히 분리할 수 없다. IAS/TAS, rod, 가속도, 브레이크로 대체해도 실제 정지/등속 활주를 일반적으로 구분하지 못한다.
+- 설치 공식 Scripts/Export.lua:855 세계 속도, :862 LoGetAircraftDrawArgumentValue(arg) 확인. FA-18C/FM/config.lua:91/142/193의 arg_wheel_rotation은 101/103/102(전륜/좌/우); AH-64D에서도 같은 번호 사용을 확인. 이는 외형 애니메이션 인자이지 직접 RPM API는 아니다. P-51/도라 및 전 기체 공통 지원, 항모 정지 시 고정 여부는 미검증.
+- 제안: 중계 Lua에서 101/102/103 원본을 추가 전송하고 효과 Lua가 접지+시간에 따른 변화로 판정. 현재 C++ 수신 및 Lua 변환은 dcs 객체를 그대로 전달하므로 수신 엔진 구조 변경은 필요 없어 보인다. 자동완성/계약/배포 relay 버전·설치 무결성 갱신은 후속 구현 범위다. Export.lua 로더/서버/프로토콜 구조 변경은 필요하지 않다.
+- 한계: 순환 인자 샘플링은 고속에서 회전수 누락/aliasing이 생기며 50ms로 정확한 RPM·속도 복원 불가. 정지/회전 판정도 실기 확인 필요. 미지원 고정0과 정지0을 자동 구분 불가. 세계속도 fallback은 항모 오류를 재도입하므로 무조건 사용하지 않는다. 접지 조건으로 공중 잔류 회전을 제외하고 첫 샘플/세션 변경/오래된 입력은 기준 재설정 필요.
+- FM 헤더의 ed_fm_suspension_info.wheel_speed_X는 모듈 제작자용 피드백이며 일반 Export에서 직접 읽는 API로 확인되지 않았다. 항모 위치 차분을 이용하는 대안은 월드 export 권한·접촉 함정 식별·선회/갑판 운동 처리가 추가되어 이번 목표에 비해 복잡하다.
+- 외부 대조: VPforce-TelemFFB master export/TelemFFB.lua에는 조사 시 wheel/carrier 항목이 없었으며 자체 휠 회전 해법의 근거로 쓰지 않는다. 코드 복사 없음.
+- 코드/README/dist/사용자 Export.lua 변경, 빌드, 앱/게임/HID 실행, 테스트, 커밋 없음. 인계용 조사 기록만 추가한다. 구현 방식은 아직 미확정이다.
+
 
 ## 최신 작업 — 2026-11-15 DCS 지원 0.4.0 배포 준비 완료
 

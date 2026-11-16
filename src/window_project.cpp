@@ -194,7 +194,26 @@ void Window::updateRecent() {
     recentMenu->clear();for(auto v:local["recent_projects"].toArray()) {
         auto path=v.toString();auto* a=recentMenu->addAction(path);connect(a,&QAction::triggered,this,[this,path]{guarded([this,path]{if(confirmDiscard())loadProject(path);});});
     }
-    recentMenu->setEnabled(!recentMenu->actions().isEmpty());
+    if(!recentMenu->actions().isEmpty())recentMenu->addSeparator();
+    auto* configure=recentMenu->addAction("Configure Recent Projects...");
+    connect(configure,&QAction::triggered,this,[this]{
+        QDialog dialog(this);dialog.setWindowTitle("Configure Recent Projects");dialog.resize(680,360);
+        QVBoxLayout layout(&dialog);
+        layout.addWidget(new QLabel("Remove entries from this list without deleting project files."));
+        QListWidget list;list.setSelectionMode(QAbstractItemView::ExtendedSelection);
+        for(auto value:local["recent_projects"].toArray())list.addItem(value.toString());
+        layout.addWidget(&list);
+        QPushButton remove("Remove Selected");remove.setEnabled(false);layout.addWidget(&remove);
+        connect(&list,&QListWidget::itemSelectionChanged,&dialog,[&]{remove.setEnabled(!list.selectedItems().isEmpty());});
+        connect(&remove,&QPushButton::clicked,&dialog,[&]{for(auto* item:list.selectedItems())delete list.takeItem(list.row(item));});
+        QDialogButtonBox buttons(QDialogButtonBox::Save|QDialogButtonBox::Cancel);layout.addWidget(&buttons);
+        connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
+        connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+        if(dialog.exec()!=QDialog::Accepted)return;
+        QJsonArray recent;for(int i=0;i<list.count();++i)recent.append(list.item(i)->text());
+        local["recent_projects"]=recent;saveLocal();updateRecent();
+    });
+    recentMenu->setEnabled(true);
 }
 void Window::syncFiles() {
     syncExplorerFiles();

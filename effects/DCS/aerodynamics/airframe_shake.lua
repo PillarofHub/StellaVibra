@@ -1,9 +1,9 @@
 local effect = {}
 
 function effect:init(context)
-    context:parameter {name="Power", type="haptic_power", default={strength=30, pwm=false, on_ms=20, period_ms=80}}
+    context:parameter {name="Power", type="haptic_power", default={strength=40, pwm=false, on_ms=20, period_ms=80}}
     context:parameter {name="Minimum amplitude", type="float", default=0, min=0, max=10, step=0.01}
-    context:parameter {name="Full power amplitude", type="float", default=1, min=0.01, max=10, step=0.01}
+    context:parameter {name="Full power amplitude", type="float", default=2, min=0.01, max=10, step=0.01}
     context:output("Airframe", {"Stick:1", "Throttle:1", "Throttle:2"})
 end
 

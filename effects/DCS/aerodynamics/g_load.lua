@@ -1,10 +1,10 @@
 local effect = {}
 
 function effect:init(context)
-    context:parameter {name="Power", type="haptic_power", default={strength=25, pwm=false, on_ms=20, period_ms=80}}
+    context:parameter {name="Power", type="haptic_power", default={strength=20, pwm=false, on_ms=20, period_ms=80}}
     context:parameter {name="Direction", type="enum", default="Positive", choices={"Positive", "Negative", "Both"}}
-    context:parameter {name="Start G", type="float", default=2, min=0, max=20, step=0.1}
-    context:parameter {name="Full power G", type="float", default=6, min=0.1, max=30, step=0.1}
+    context:parameter {name="Start G", type="float", default=6, min=0, max=20, step=0.1}
+    context:parameter {name="Full power G", type="float", default=9, min=0.1, max=30, step=0.1}
     context:output("G Load", {"Throttle:1", "Throttle:2"})
 end
 

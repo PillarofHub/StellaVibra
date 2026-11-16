@@ -66,3 +66,16 @@ Remove Scripts는 확인 후 현재 Export.lua의 대상 행과 전용 StellaVib
 ## 확인 범위
 
 API 근거는 설치 DCS 2.9.31.29434의 Scripts/Export.lua 및 기존 DCS-TELEMETRY.md 조사다. Lua5.1 호환 문법으로 작성했으나 빌드에 포함된 구문 검사는 Lua5.4 컴파일러다. 실제 DCS VM/기체별 반환·콜백 공존·UDP 수신·설치/제거 GUI는 사용자 확인 대상이며 자동 실행 테스트를 하지 않는다.
+
+## 2026-11-16 후속 구현 계약
+
+사용자 승인으로 relay v3는 LoGetAircraftDrawArgumentValue의 101/102/103 원본을 문자열 키로 수집한다. protocol 1/manifest schema 2 및 고정 로더 유지. C++은 원본 객체 전달, 뷰/문자열 키 자동완성 추가. Ground Roll은 기어별 rod>1e-6 및 새 표본의 회전 인자 변화로 출력한다. Center/Left/Right Gear는 Stick:1/Throttle:1/Throttle:2, Power1 PWM20/80, 100ms 갱신. 첫 표본/누락/공중/시간 비전진·500ms 이상 간격에서는 회전 출력을 만들지 않는다. 세계속도 fallback/Minimum speed 제거. 기존 프로젝트는 자동 수정하지 않으며 예전 Ground 라우팅과 Minimum speed override 정리가 필요하다. P-51D/도라/항모 및 고속 aliasing 실기는 미검증.
+
+Shake 기본 Power40/입력0–2/Constant, G Load 기본6–9G/Power25/Constant. 6G는 범용 고G 경고 출발값이며 실제 파손/실신 한계가 아니다. 강한 Shake가 기존 우선순위로 G Load를 가릴 수 있어 Power 조절을 매뉴얼에 안내한다. airbrake.lua 추가: 이미 수집 중인 LoGetMechInfo.speedbrakes.value>0.01 및 공중 조건, Power20 Constant, Throttle1/2, 100ms. 값 누락 시 off, 실제 버핏/범용 spoiler 센서로 표현하지 않는다. 기본 효과 총47개(DCS6).
+
+Open Recent 하단 Configure Recent Projects...에서 다중 선택 삭제 후 Save/Cancel. pref의 recent_projects만 수정하며 실제 프로젝트 파일/현재 열린 프로젝트/last_project는 유지한다. 재열기 시 기존 규칙대로 최근 목록에 추가된다. 버전0.4.0 유지, 공개 패키지/태그/커밋은 이번 요청에 포함되지 않는다.
+## 2026-11-16 버전 0.4.2 확정
+
+사용자가 호넷 항모에서 새 휠 기반 Ground Roll 동작을 확인했다. P-51D/도라 및 전 기체 검증으로 일반화하지 않는다. Airbrake 기본 Power2, G Load 기본 Power20으로 변경하며 Shake40/입력0–2, G6–9는 유지한다. 기존 우선순위상 Shake가 G Load보다 우선할 수 있는 동작을 수용한다. 기존 프로젝트/기체 override는 보존하며 새 기본값으로 자동 덮어쓰지 않는다.
+
+사용자가 0.4.2 지정 및 로컬 커밋을 요청했다. 직전 미커밋 휠/relay3/에어브레이크/최근목록 관리 변경을 함께 커밋하고 scripts/build.ps1 -Deploy로 갱신한다. 태그/푸시/Release/ZIP 생성은 이번 요청에 포함되지 않는다. 과거 조사 보류/0.4.0 유지/커밋 없음 기록보다 이 결정을 우선한다.

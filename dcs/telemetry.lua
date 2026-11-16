@@ -1,4 +1,4 @@
--- Stella Vibra DCS relay v2; DCS Lua 5.1 compatible. No effect decisions here.
+-- Stella Vibra DCS relay v3; DCS Lua 5.1 compatible. No effect decisions here.
 if _G.StellaVibraTelemetryLoaded then return end
 local root = lfs.writedir() .. "Scripts/StellaVibra Telemetry/"
 local config = dofile(root .. "config.lua")
@@ -19,9 +19,9 @@ local function report(key, err)
     errors[key] = true
     if log and log.write then log.write("StellaVibra", log.ERROR, key .. ": " .. tostring(err)) end
 end
-local function call(name)
+local function call(name, ...)
     if type(_G[name]) ~= "function" then return nil end
-    local ok, value = pcall(_G[name])
+    local ok, value = pcall(_G[name], ...)
     if ok then return value end
     report(name, value)
 end
@@ -90,6 +90,10 @@ local function publish(stopped)
         for _, name in ipairs({"LoGetPlayerPlaneId", "LoGetInAir", "LoGetIndicatedAirSpeed",
             "LoGetTrueAirSpeed", "LoGetMachNumber", "LoGetAngleOfAttack", "LoGetAccelerationUnits",
             "LoGetVectorVelocity", "LoGetAngularVelocity", "LoGetShakeAmplitude"}) do data[name] = call(name) end
+        data.LoGetAircraftDrawArgumentValue = {}
+        for _, arg in ipairs({101, 102, 103}) do
+            data.LoGetAircraftDrawArgumentValue[tostring(arg)] = call("LoGetAircraftDrawArgumentValue", arg)
+        end
         local mech = call("LoGetMechInfo")
         if type(mech) == "table" then data.LoGetMechInfo = {gear=mech.gear, flaps=mech.flaps, speedbrakes=mech.speedbrakes} end
         local engine = call("LoGetEngineInfo")
